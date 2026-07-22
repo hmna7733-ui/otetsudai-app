@@ -70,6 +70,13 @@ body{
   display:flex; align-items:center; justify-content:space-between;
   padding:18px 20px 10px;
 }
+.topbar-main{
+  padding-top:calc(18px + env(safe-area-inset-top));
+}
+.account-email{
+  font-size:10.5px; color:var(--plum-soft); opacity:.8;
+  max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .topbar h1{
   font-size:20px; margin:0; font-family:'Kosugi Maru',sans-serif;
   display:flex; align-items:center; gap:6px;
@@ -610,11 +617,12 @@ textarea{resize:vertical; min-height:70px;}
   <!-- ============ MAIN APP ============ -->
   <div id="mainApp" style="display:none;">
 
-    <div class="topbar">
+    <div class="topbar topbar-main">
       <h1 id="familyNameShow">🐷 ごほうびちょきん</h1>
-      <div style="display:flex; align-items:center; gap:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
         <div class="bell-wrap" id="bellWrap" style="display:none;" onclick="openNotifications()">🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span></div>
         <div class="role-pill" id="rolePill"><span class="dot"></span><span id="roleLabel">こども</span></div>
+        <div class="account-email" id="accountEmailLabel" style="display:none;"></div>
       </div>
     </div>
 
@@ -883,6 +891,17 @@ function attachFamilySync(uid){
     }
   }, err=>console.warn("同期エラー", err));
 }
+function updateAccountEmailLabel(user){
+  const el = document.getElementById("accountEmailLabel");
+  if(!el) return;
+  if(fbEnabled && user && user.email){
+    el.textContent = user.email;
+    el.title = user.email;
+    el.style.display = "block";
+  } else {
+    el.style.display = "none";
+  }
+}
 function applyRemoteState(remoteData){
   const keepDeviceType = state.deviceType;
   const keepRole = state.role;
@@ -896,7 +915,13 @@ function applyRemoteState(remoteData){
 /* ---------------- Constants ---------------- */
 const STORAGE_KEY = "gohoubi_chokin_state_v2"; // v1から変更：次回起動時は必ず最初の端末選択画面からやり直せるようにするため
 const WEEKDAYS = ["日","月","火","水","木","金","土"];
-const CHORE_EMOJI = ["🧹","🧺","🍽️","🐕","🛏️","🗑️","🧽","🚿","📚","🛒","🪴","👕"];
+const CHORE_EMOJI = ["🧹","🧺","🍽️","🐕","🛏️","🗑️","🧽","🚿","📚","🛒","🪴","🚽","👩","👨"];
+const CHORE_EMOJI_LABEL = {
+  "🧹":"そうじ", "🧺":"せんたくもの", "🍽️":"しょくじ", "🐕":"ペット",
+  "🛏️":"ふとん", "🗑️":"ゴミすて", "🧽":"みずまわり", "🚿":"おふろ",
+  "📚":"せいりせいとん", "🛒":"おかいもの", "🪴":"みずやり", "🚽":"トイレそうじ",
+  "👩":"ママ", "👨":"パパ"
+};
 const BADGES = [
   {id:"first", em:"🌱", t:"はじめの一歩", test:s=>isSetupComplete(s)},
 ];
@@ -1031,6 +1056,15 @@ function cycleLabel(c){
   if(c.type==="weekly") return "週：" + (c.days||[]).map(i=>WEEKDAYS[i]).join("・");
   if(c.type==="everyNDays") return `${c.n||1}日おき`;
   return "";
+}
+function sortByDeadline(list){
+  return [...list].sort((a,b)=>{
+    const at = a.deadlineTime, bt = b.deadlineTime;
+    if(at && bt) return at.localeCompare(bt);
+    if(at && !bt) return -1;
+    if(!at && bt) return 1;
+    return 0;
+  });
 }
 
 /* ---------------- Derived data ---------------- */
@@ -1210,13 +1244,15 @@ function renderHome(){
 
   // tasks
   const due = state.chores.filter(c=>isChoreDueToday(c, ds));
-  const must = due.filter(c=>c.priority==="must");
+  let must = due.filter(c=>c.priority==="must");
   let opt = due.filter(c=>c.priority!=="must");
   const extraIds = log.extraOptional || [];
   const extraChores = state.chores
     .filter(c=> extraIds.includes(c.id) && !due.some(d=>d.id===c.id))
     .map(c=> c.priority==="must" ? Object.assign({}, c, {priority:"optional"}) : c);
   opt = [...opt, ...extraChores];
+  must = sortByDeadline(must);
+  opt = sortByDeadline(opt);
   document.getElementById("mustCount").textContent = must.length;
   document.getElementById("optCount").textContent = opt.length;
   document.getElementById("mustTaskList").innerHTML = must.map(c=>taskCardHtml(c, log)).join("") || `<div class="empty-note">今日の必須タスクはないよ</div>`;
@@ -1252,7 +1288,7 @@ function taskCardHtml(c, log){
     <div class="task-emoji">${c.emoji||"🧹"}</div>
     <div class="task-info">
       <div class="name ${done?"done-text":""}">${esc(c.name)}</div>
-      <div class="meta">${cycleLabel(c.cycle)}${c.condition? " ・ "+esc(c.condition):""}</div>
+      <div class="meta">${cycleLabel(c.cycle)}${c.deadlineTime?" ・ 🕒"+esc(c.deadlineTime)+"までに":""}${c.condition? " ・ "+esc(c.condition):""}</div>
       <div class="tagrow"><span class="tag ${c.priority==='must'?'must':'optional'}">${c.priority==='must'?'ぜったい':'ボーナス'}</span></div>
     </div>
     <div class="task-amount">+${c.amount}円</div>
@@ -1284,22 +1320,46 @@ function toggleChore(choreId, ev){
     saveState(); renderHome();
     return;
   }
-  if(state.role==="child"){
+  if(chore.countEnabled){
+    openCountInputModal(chore, (qty)=>{
+      const amount = chore.amount * qty;
+      openConfirmDoneModal(chore.name, ()=> completeChore(chore, ds, ev, amount));
+    });
+  } else if(state.role==="child"){
     openConfirmDoneModal(chore.name, ()=> completeChore(chore, ds, ev));
   } else {
     completeChore(chore, ds, ev);
   }
 }
-function completeChore(chore, ds, ev){
+function openCountInputModal(chore, onNext){
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>個数を入力</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px 10px;">
+      <p style="font-size:15px; font-weight:700; text-align:center; margin:6px 0 14px;">「${esc(chore.name)}」を<br>いくつ やった？</p>
+      <input type="number" id="cf_count_input" value="1" min="1" style="text-align:center; font-size:22px; font-weight:800;">
+      <p style="font-size:12px; color:var(--plum-soft); text-align:center; margin-top:8px;">1個 ${chore.amount}円</p>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" id="countInputNextBtn">次へ</button>
+    </div>`;
+  openModal(html);
+  document.getElementById("countInputNextBtn").onclick = ()=>{
+    const qty = parseInt(document.getElementById("cf_count_input").value)||0;
+    if(qty<=0){ toast("1こ以上を入力してね"); return; }
+    closeModal();
+    onNext(qty);
+  };
+}
+function completeChore(chore, ds, ev, overrideAmount){
   const log = getLog(ds);
+  const amount = (overrideAmount!=null) ? overrideAmount : chore.amount;
   log.completed.push(chore.id);
   chore.lastDone = ds;
-  addIncomeSplit(chore.amount, chore.name, {source:"chore", refId:chore.id, date:ds});
-  pushNotification(`「${chore.name}」を完了したよ！（+${chore.amount}円）`);
+  addIncomeSplit(amount, chore.name, {source:"chore", refId:chore.id, date:ds});
+  pushNotification(`「${chore.name}」を完了したよ！（+${amount}円）`);
   checkStreakBonus(ds);
   checkOtherMilestones();
   saveState(); coinBurst(ev);
-  toast(`+${chore.amount}円！やったね✨`);
+  toast(`+${amount}円！やったね✨`);
   renderHome();
 }
 function toggleEmergency(eid, ev){
@@ -1411,17 +1471,37 @@ function renderChores(){
   const isParent = state.role==="parent";
   document.getElementById("btnAddChore").style.display = isParent ? "block" : "none";
   const wrap = document.getElementById("choreListWrap");
-  wrap.innerHTML = state.chores.map(c=>`
-    <div class="chore-row">
-      <div style="font-size:22px;">${c.emoji||"🧹"}</div>
-      <div style="flex:1;">
-        <div class="name">${esc(c.name)} <span class="tag ${c.priority==='must'?'must':'optional'}" style="margin-left:4px;">${c.priority==='must'?'ぜったい':'ボーナス'}</span></div>
-        <div class="meta">${cycleLabel(c.cycle)}${c.condition?" ・ "+esc(c.condition):""}</div>
+  if(state.chores.length===0){
+    wrap.innerHTML = `<div class="empty-note">まだお手伝いがありません。${isParent? "「＋新しいお手伝いを追加」から作ってみよう。":"おうちの人に追加してもらってね。"}</div>`;
+    return;
+  }
+  // アイコンごとにグループ化し、各グループ内は金額の高い順に並べる
+  const groups = new Map();
+  state.chores.forEach(c=>{
+    const em = c.emoji || "🧹";
+    if(!groups.has(em)) groups.set(em, []);
+    groups.get(em).push(c);
+  });
+  const knownOrder = CHORE_EMOJI.filter(em=>groups.has(em));
+  const otherOrder = [...groups.keys()].filter(em=>!CHORE_EMOJI.includes(em));
+  const orderedEmojis = [...knownOrder, ...otherOrder];
+
+  wrap.innerHTML = orderedEmojis.map(em=>{
+    const items = [...groups.get(em)].sort((a,b)=>b.amount-a.amount);
+    const label = CHORE_EMOJI_LABEL[em] || "";
+    const rows = items.map(c=>`
+      <div class="chore-row">
+        <div style="font-size:22px;">${c.emoji||"🧹"}</div>
+        <div style="flex:1;">
+          <div class="name">${esc(c.name)} <span class="tag ${c.priority==='must'?'must':'optional'}" style="margin-left:4px;">${c.priority==='must'?'ぜったい':'ボーナス'}</span></div>
+          <div class="meta">${cycleLabel(c.cycle)}${c.deadlineTime?" ・ 🕒"+esc(c.deadlineTime)+"までに":""}${c.condition?" ・ "+esc(c.condition):""}</div>
+        </div>
+        <div class="amt">${c.amount}円</div>
+        ${isParent ? `<button class="icon-btn" onclick="confirmEditChore('${c.id}')">✏️</button><button class="icon-btn" onclick="deleteChore('${c.id}')">🗑️</button>` : ``}
       </div>
-      <div class="amt">${c.amount}円</div>
-      ${isParent ? `<button class="icon-btn" onclick="confirmEditChore('${c.id}')">✏️</button><button class="icon-btn" onclick="deleteChore('${c.id}')">🗑️</button>` : ``}
-    </div>
-  `).join("") || `<div class="empty-note">まだお手伝いがありません。${isParent? "「＋新しいお手伝いを追加」から作ってみよう。":"おうちの人に追加してもらってね。"}</div>`;
+    `).join("");
+    return `<div class="section-label" style="margin:16px 2px 8px;">${em} ${label}</div>${rows}`;
+  }).join("");
 }
 function deleteChore(id){
   if(state.role!=="parent"){ toast("保護者モードでのみ削除できます"); return; }
@@ -1470,6 +1550,20 @@ function openChoreForm(existingId){
           ${WEEKDAYS.map((w,i)=>`<div class="chip ${cycle.days&&cycle.days.includes(i)?'sel':''}" data-d="${i}" onclick="toggleWeekday(this,${i})">${w}</div>`).join("")}
         </div>
       </div>
+      <label class="f">時間指定（にんい）</label>
+      <div class="pill-select" id="cf_deadline_toggle">
+        <button type="button" data-v="none" class="${!(existing&&existing.deadlineTime)?'active':''}" onclick="pickDeadlineMode(this,'none')">設定なし</button>
+        <button type="button" data-v="set" class="${(existing&&existing.deadlineTime)?'active':''}" onclick="pickDeadlineMode(this,'set')">〇〇時までに</button>
+      </div>
+      <div id="cf_deadline_wrap" style="display:${(existing&&existing.deadlineTime)?'block':'none'}; margin-top:10px;">
+        <input type="time" id="cf_deadline_time" value="${existing&&existing.deadlineTime?existing.deadlineTime:'18:00'}">
+      </div>
+      <label class="f">個数の設定</label>
+      <div class="pill-select" id="cf_count_toggle">
+        <button type="button" data-v="off" class="${!(existing&&existing.countEnabled)?'active':''}" onclick="pickCountMode(this,'off')">オフ</button>
+        <button type="button" data-v="on" class="${(existing&&existing.countEnabled)?'active':''}" onclick="pickCountMode(this,'on')">オン</button>
+      </div>
+      <p style="font-size:11.5px; color:var(--plum-soft); margin:4px 2px 0;">オンにすると、ホームでチェックを入れる時に個数を入力できます。上の金額は「1個あたりの金額」になります（例：1個5円で20個なら100円）。</p>
       <label class="f">条件・メモ（任意）</label>
       <input type="text" id="cf_condition" value="${existing?esc(existing.condition||""):""}" placeholder="例：夜ごはんの前に">
       <button class="btn btn-primary btn-block" style="margin-top:18px;" onclick="saveChoreForm('${existingId||""}')">保存する</button>
@@ -1479,7 +1573,9 @@ function openChoreForm(existingId){
   window._cf_emoji = existing? existing.emoji : CHORE_EMOJI[0];
   window._cf_priority = existing? existing.priority : "must";
   window._cf_cycletype = cycle.type;
-  window._cf_weekdays = cycle.days? [...cycle.days] : [1,3,5];
+  window._cf_weekdays = cycle.days? [...cycle.days] : [];
+  window._cf_deadlinemode = (existing&&existing.deadlineTime) ? "set" : "none";
+  window._cf_countmode = (existing&&existing.countEnabled) ? "on" : "off";
 }
 function pickEmoji(el, em){ document.querySelectorAll("#cf_emoji_row .chip").forEach(c=>c.classList.remove("sel")); el.classList.add("sel"); window._cf_emoji=em; }
 function pickPriority(el, v){ document.querySelectorAll("#cf_priority button").forEach(c=>c.classList.remove("active")); el.classList.add("active"); window._cf_priority=v; }
@@ -1488,6 +1584,15 @@ function pickCycleType(el, v){
   window._cf_cycletype=v;
   document.getElementById("cf_ndays_wrap").style.display = v==="everyNDays"?"block":"none";
   document.getElementById("cf_weekly_wrap").style.display = v==="weekly"?"block":"none";
+}
+function pickDeadlineMode(el, v){
+  document.querySelectorAll("#cf_deadline_toggle button").forEach(c=>c.classList.remove("active")); el.classList.add("active");
+  window._cf_deadlinemode = v;
+  document.getElementById("cf_deadline_wrap").style.display = v==="set"?"block":"none";
+}
+function pickCountMode(el, v){
+  document.querySelectorAll("#cf_count_toggle button").forEach(c=>c.classList.remove("active")); el.classList.add("active");
+  window._cf_countmode = v;
 }
 function toggleWeekday(el,i){
   el.classList.toggle("sel");
@@ -1502,14 +1607,20 @@ function saveChoreForm(existingId){
   const condition = document.getElementById("cf_condition").value.trim();
   let cycle;
   if(window._cf_cycletype==="everyNDays") cycle = {type:"everyNDays", n: parseInt(document.getElementById("cf_ndays").value)||1};
-  else if(window._cf_cycletype==="weekly") cycle = {type:"weekly", days: window._cf_weekdays};
+  else if(window._cf_cycletype==="weekly"){
+    if(!window._cf_weekdays || window._cf_weekdays.length===0){ toast("曜日を1つ以上えらんでね"); return; }
+    cycle = {type:"weekly", days: window._cf_weekdays};
+  }
   else cycle = {type:"daily"};
+
+  const deadlineTime = window._cf_deadlinemode==="set" ? (document.getElementById("cf_deadline_time").value || null) : null;
+  const countEnabled = window._cf_countmode==="on";
 
   if(existingId){
     const c = state.chores.find(x=>x.id===existingId);
-    Object.assign(c, {name, amount, condition, cycle, priority:window._cf_priority, emoji:window._cf_emoji});
+    Object.assign(c, {name, amount, condition, cycle, priority:window._cf_priority, emoji:window._cf_emoji, deadlineTime, countEnabled});
   } else {
-    state.chores.push({id:cid(), name, amount, condition, cycle, priority:window._cf_priority, emoji:window._cf_emoji, lastDone:null});
+    state.chores.push({id:cid(), name, amount, condition, cycle, priority:window._cf_priority, emoji:window._cf_emoji, deadlineTime, countEnabled, lastDone:null});
   }
   saveState(); closeModal(); renderChores(); renderHome();
   toast("保存したよ！");
@@ -2492,6 +2603,7 @@ function switchScreen(name){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById("screen-"+name).classList.add("active");
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.screen===name));
+  window.scrollTo(0,0);
   if(name==="home") renderHome();
   if(name==="chores") renderChores();
   if(name==="ledger") renderLedger();
@@ -2662,6 +2774,7 @@ document.getElementById("btnFbSignOut").onclick = ()=>{
   const deviceConfigured = !!localStorage.getItem(STORAGE_KEY);
   if(fbEnabled){
     auth.onAuthStateChanged(user=>{
+      updateAccountEmailLabel(user);
       if(user){
         attachFamilySync(user.uid);
         if(deviceConfigured) enterApp();
