@@ -813,6 +813,19 @@ textarea{resize:vertical; min-height:70px;}
       </div>
 
       <div class="card">
+        <h2>🏦 貯金箱に入金・出金</h2>
+        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">お年玉などを貯金箱に追加したり、ほしいものを買うために貯金箱から引き出したりできます（お手伝いの記録には影響しません）。</p>
+        <label class="f">金額（円）</label>
+        <input type="number" id="savingsAdjustAmount" placeholder="例：5000">
+        <label class="f">メモ（任意）</label>
+        <input type="text" id="savingsAdjustMemo" placeholder="例：おばあちゃんからのお年玉">
+        <div style="display:flex; gap:10px; margin-top:14px;">
+          <button class="btn btn-mint btn-block" id="btnDepositSavings">＋ 貯金箱に追加</button>
+          <button class="btn btn-outline btn-block" id="btnWithdrawSavings">－ 貯金箱から引き出す</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>🔑 かくにん用パスワード</h2>
         <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;" id="pwCardDesc">こども視点から戻るとき・月末ふりかえりを終えるときに使うパスワードです。</p>
         <label class="f">新しいパスワード（4文字以上）</label>
@@ -1110,10 +1123,11 @@ function splitIncome(amount, ds){
   const r = state.savingsRule || {type:"fixed", value:0};
   let toSavings;
   if(r.type==="fixed"){
-    // 先取り貯金：その日の合計金額のうち、貯金箱への「今日の目標額」に達するまでを先取りし、残りは財布へ
+    // 先取り貯金：その日「お手伝い・緊急ミッションで」貯金箱へ入った金額（残高調整やガチャ・保護者の入出金は含めない）が
+    // 「今日の目標額」に達するまでを先取りし、残りは財布へ
     const threshold = Math.max(0, r.value||0);
     const savingsSoFarToday = (state.transactions||[])
-      .filter(t=> t.date===ds && t.type==="income" && (t.bucket||"wallet")==="savings")
+      .filter(t=> t.date===ds && t.type==="income" && (t.bucket||"wallet")==="savings" && (t.source==="chore" || t.source==="emergency"))
       .reduce((s,t)=>s+t.amount, 0);
     const remainingCapacity = Math.max(0, threshold - savingsSoFarToday);
     toSavings = Math.min(amount, remainingCapacity);
@@ -1347,6 +1361,7 @@ function taskCardHtml(c, log){
 }
 function emergencyCardHtml(e, log){
   const done = !!e.done;
+  const isParent = state.role==="parent";
   return `<div class="task-card emergency ${done?"done":""}">
     <div class="task-emoji">${e.emoji||"🚨"}</div>
     <div class="task-info">
@@ -1355,8 +1370,56 @@ function emergencyCardHtml(e, log){
       <div class="tagrow"><span class="tag emergency">きんきゅう</span></div>
     </div>
     <div class="task-amount">+${e.amount}円</div>
+    ${isParent ? `<button class="icon-btn" onclick="editEmergency('${e.id}')">✏️</button><button class="icon-btn" onclick="deleteEmergency('${e.id}')">🗑️</button>` : ``}
     <button class="check-btn ${done?"checked":""}" onclick="toggleEmergency('${e.id}', event)">${done?"✓":""}</button>
   </div>`;
+}
+function editEmergency(id){
+  if(state.role!=="parent"){ toast("保護者モードでのみ編集できます"); return; }
+  const ds = todayStr();
+  const log = getLog(ds);
+  const e = log.emergencies.find(x=>x.id===id);
+  if(!e) return;
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🚨 緊急ミッションを編集</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">内容</label>
+      <input type="text" id="em_editName" value="${esc(e.name)}">
+      <label class="f">報酬金額</label>
+      <input type="number" id="em_editAmount" value="${e.amount}">
+      <button class="btn btn-danger btn-block" style="margin-top:18px;" onclick="saveEmergencyEdit('${id}')">保存する</button>
+    </div>`;
+  openModal(html);
+}
+function saveEmergencyEdit(id){
+  const ds = todayStr();
+  const log = getLog(ds);
+  const e = log.emergencies.find(x=>x.id===id);
+  if(!e) return;
+  const name = document.getElementById("em_editName").value.trim();
+  if(!name){ toast("内容を入れてね"); return; }
+  const amount = parseInt(document.getElementById("em_editAmount").value)||0;
+  const wasDone = e.done;
+  e.name = name; e.amount = amount;
+  if(wasDone){
+    // すでに完了して報酬を渡し済みの場合は、取引記録も新しい内容で作り直す
+    removeTransactionFor("emergency", id, ds);
+    addIncomeSplit(amount, `${name}（緊急ミッション）`, {source:"emergency", refId:id, date:ds});
+  }
+  saveState(); closeModal(); renderHome();
+  toast("編集したよ");
+}
+function deleteEmergency(id){
+  if(state.role!=="parent"){ toast("保護者モードでのみ削除できます"); return; }
+  openConfirmModal("この緊急ミッションを削除しますか？", ()=>{
+    const ds = todayStr();
+    const log = getLog(ds);
+    removeTransactionFor("emergency", id, ds);
+    log.emergencies = log.emergencies.filter(x=>x.id!==id);
+    saveState(); renderHome();
+    toast("削除したよ");
+  }, "削除する", true);
 }
 
 function toggleChore(choreId, ev){
@@ -1950,9 +2013,33 @@ function setBalances(){
   const wDiff = newWallet - curWallet;
   const sDiff = newSavings - curSavings;
   const ds = todayStr();
-  if(wDiff!==0) addTransaction(wDiff>0?"income":"expense", Math.abs(wDiff), "残高調整（保護者設定）", {bucket:"wallet", date:ds});
-  if(sDiff!==0) addTransaction(sDiff>0?"income":"expense", Math.abs(sDiff), "残高調整（保護者設定）", {bucket:"savings", date:ds});
+  if(wDiff!==0) addTransaction(wDiff>0?"income":"expense", Math.abs(wDiff), "残高調整（保護者設定）", {bucket:"wallet", source:"balanceAdjust", date:ds});
+  if(sDiff!==0) addTransaction(sDiff>0?"income":"expense", Math.abs(sDiff), "残高調整（保護者設定）", {bucket:"savings", source:"balanceAdjust", date:ds});
   saveState(); renderHome(); toast("金額を設定したよ");
+}
+function depositToSavings(){
+  const amount = parseInt(document.getElementById("savingsAdjustAmount").value)||0;
+  if(amount<=0){ toast("金額を入力してね"); return; }
+  const memo = document.getElementById("savingsAdjustMemo").value.trim();
+  addTransaction("income", amount, memo || "貯金箱に追加（保護者）", {bucket:"savings", source:"parentAdjust", date:todayStr()});
+  saveState(); renderHome(); renderSettings();
+  document.getElementById("savingsAdjustAmount").value = "";
+  document.getElementById("savingsAdjustMemo").value = "";
+  toast(`貯金箱に${amount.toLocaleString("ja-JP")}円 追加したよ`);
+}
+function withdrawFromSavings(){
+  const amount = parseInt(document.getElementById("savingsAdjustAmount").value)||0;
+  if(amount<=0){ toast("金額を入力してね"); return; }
+  const cur = getBucketBalance("savings");
+  if(amount>cur){ toast("貯金箱の残高より多い金額は引き出せません"); return; }
+  const memo = document.getElementById("savingsAdjustMemo").value.trim();
+  openConfirmModal(`貯金箱から${amount.toLocaleString("ja-JP")}円 引き出しますか？`, ()=>{
+    addTransaction("expense", amount, memo || "貯金箱から引き出し（保護者）", {bucket:"savings", source:"parentAdjust", date:todayStr()});
+    saveState(); renderHome(); renderSettings();
+    document.getElementById("savingsAdjustAmount").value = "";
+    document.getElementById("savingsAdjustMemo").value = "";
+    toast(`貯金箱から${amount.toLocaleString("ja-JP")}円 引き出したよ`);
+  }, "引き出す", true);
 }
 function toggleMilestone(el, key){
   window._streakMilestones[key] = !window._streakMilestones[key];
@@ -2244,7 +2331,7 @@ function reflectionDue(){
   return null;
 }
 function buildReflectionStats(){
-  const income = state.transactions.filter(t=>t.type==="income" && !t._reflected).reduce((s,t)=>s+t.amount,0);
+  const income = state.transactions.filter(t=>t.type==="income" && !t._reflected && t.source!=="balanceAdjust" && t.source!=="parentAdjust").reduce((s,t)=>s+t.amount,0);
   const expense = state.transactions.filter(t=>t.type==="expense" && !t._reflected).reduce((s,t)=>s+t.amount,0);
   let doneDays=0, totalDueDays=0;
   let extraAdded=0, extraCompleted=0;
@@ -2832,6 +2919,8 @@ document.getElementById("btnAddGachaPrize").onclick = addGachaPrize;
 document.getElementById("btnSaveGacha").onclick = saveGacha;
 document.getElementById("btnTestGacha").onclick = testGachaSpin;
 document.getElementById("btnSetBalances").onclick = setBalances;
+document.getElementById("btnDepositSavings").onclick = depositToSavings;
+document.getElementById("btnWithdrawSavings").onclick = withdrawFromSavings;
 document.getElementById("btnChangePassword").onclick = changeParentPassword;
 document.getElementById("btnFbSignOut").onclick = ()=>{
   openConfirmModal("この端末でログアウトしますか？次回からまたログインが必要になります。", ()=>{
