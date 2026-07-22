@@ -947,25 +947,30 @@ const BADGES = [
 function buildStreakBadges(){
   const milestones = [3,7,15,30];
   const emojis = {3:"🔥", 7:"🌟", 15:"👑", 30:"🏅"};
-  return milestones.map(m=>{
+  const achieved = state.streakRunAchieved || {};
+  return milestones.filter(m=> !achieved[String(m)]).map(m=>{
     const on = (state.streakMilestones||{})[String(m)];
     const label = m===30 ? "1ヶ月連続" : `${m}日連続`;
-    return {em:emojis[m], t: label + (on ? " 🎰ガチャ" : ""), test:s=>getStreak(s)>=m};
+    return {em:emojis[m], t: label + (on ? " 🎰ガチャ" : "")};
   });
 }
 function buildBonusCountBadges(){
   const milestones = [5,10,30];
   const emojis = {5:"✨", 10:"🎉", 30:"👏"};
-  return milestones.map(m=> ({em:emojis[m], t:`ボーナスお手伝い${m}回 🎰`, test:s=>countBonusChoreCompletions(s)>=m}));
+  const achieved = state.achieved || {};
+  return milestones.filter(m=> !achieved["bonus_"+m]).map(m=> ({em:emojis[m], t:`ボーナスお手伝い${m}回 🎰`}));
 }
 function buildSavingsMilestoneBadges(){
   const milestones = [1000,3000,5000];
   const emojis = {1000:"💰", 3000:"🏆", 5000:"👑"};
-  return milestones.map(m=> ({em:emojis[m], t:`貯金箱${m.toLocaleString("ja-JP")}円 🎰`, test:s=>getBucketBalance("savings", s)>=m}));
+  const achieved = state.achieved || {};
+  return milestones.filter(m=> !achieved["savings_"+m]).map(m=> ({em:emojis[m], t:`貯金箱${m.toLocaleString("ja-JP")}円 🎰`}));
 }
-function countBonusChoreCompletions(s=state){
+function countBonusChoreCompletions(s=state, monthKey){
+  monthKey = monthKey || todayStr().slice(0,7);
   let count=0;
   Object.keys(s.dailyLog||{}).forEach(ds=>{
+    if(ds.slice(0,7)!==monthKey) return;
     const log = s.dailyLog[ds];
     const extra = new Set(log.extraOptional||[]);
     (log.completed||[]).forEach(id=>{
@@ -1008,8 +1013,10 @@ function defaultState(){
       {amount:100, percent:5},
       {amount:500, percent:1},
     ]}, // 連続ボーナスガチャの景品（金額と当選確率％、合計100%に自動調整）
-    streakAwardedDates:{}, // milestone(日数) -> 直近で付与した日付。二重付与防止用
-    milestoneAwarded:{}, // "bonus_5"や"savings_1000"などのキー -> 一度きり付与済みフラグ
+    achMonth:null, // 現在「達成状況」を集計している月（YYYY-MM）。月が変わると achieved をリセット
+    achieved:{}, // "bonus_5"や"savings_1000"などのキー -> 今月すでに達成済み（非表示にする）
+    streakRunAchieved:{}, // "3","7","15","30" -> 今の連続記録ですでに達成済み（連続記録が途切れたらリセット）
+    firstStepAchieved:false, // 「はじめの一歩」は一度きり。達成したら二度と表示しない
     pendingGachaDraws:[], // {id,label,type:"achievement"|"gift"} -> 達成済み／プレゼント済みでまだ子供が引いていないガチャガチャ
     giftAnnounced:[], // 子供にすでに「届いてます」を表示したガチャ券draw id
     wishlist:[], // {id,name,amount,deadline,done,doneDate} -> ほしいものリスト
@@ -1136,7 +1143,7 @@ function getStreak(s=state){
     const doneMust = log && (s.chores||[]).filter(c=>c.priority==="must" && isChoreDueToday(c,ds)).every(c=>log.completed.includes(c.id));
     if(hadMust && doneMust){ streak++; d.setDate(d.getDate()-1); }
     else break;
-    if(streak>60) break;
+    if(streak>=30) break; // 連続日数は30日を上限にする
   }
   return streak;
 }
@@ -1166,6 +1173,21 @@ function queueGachaDraw(label, type){
   state.pendingGachaDraws.push({id:cid(), label, type: type||"achievement"});
   pushNotification(`🎁 ${label}！ガチャガチャが引けるようになったよ！`);
 }
+function getMonthlyChoreSavings(monthKey, s=state){
+  monthKey = monthKey || todayStr().slice(0,7);
+  return (s.transactions||[])
+    .filter(t=> t.type==="income" && (t.bucket||"wallet")==="savings" && t.source==="chore" && (t.date||"").slice(0,7)===monthKey)
+    .reduce((sum,t)=>sum+t.amount,0);
+}
+function ensureAchievementMonth(){
+  const mk = todayStr().slice(0,7);
+  if(!state.achieved) state.achieved = {};
+  if(state.achMonth !== mk){
+    state.achMonth = mk;
+    state.achieved = {}; // 毎月1日になったら（はじめの一歩以外の）ガチャ達成状況をリセットして復活させる
+    saveState();
+  }
+}
 function checkStreakBonus(ds){
   const dueMust = state.chores.filter(c=>c.priority==="must" && isChoreDueToday(c,ds));
   if(!dueMust.length) return;
@@ -1173,30 +1195,34 @@ function checkStreakBonus(ds){
   const allDone = dueMust.every(c=>log.completed.includes(c.id));
   if(!allDone) return;
   const streak = getStreak(state);
-  const key = String(streak);
+  if(!state.streakRunAchieved) state.streakRunAchieved = {};
+  if(streak<=1) state.streakRunAchieved = {}; // 連続記録が途切れて今日が1日目 → 新しい連続記録としてリセット
   const milestones = state.streakMilestones || {};
-  if(!milestones[key]) return;
-  if(!state.streakAwardedDates) state.streakAwardedDates={};
-  if(state.streakAwardedDates[key] === ds) return;
-  state.streakAwardedDates[key] = ds;
-  const label = streak>=30 ? "1ヶ月連続達成" : `${streak}日連続達成`;
-  queueGachaDraw(label);
+  [3,7,15,30].forEach(m=>{
+    if(streak < m) return;
+    const key = String(m);
+    if(state.streakRunAchieved[key]) return;
+    if(!milestones[key]) return;
+    state.streakRunAchieved[key] = true;
+    const label = m>=30 ? "1ヶ月連続達成" : `${m}日連続達成`;
+    queueGachaDraw(label);
+  });
 }
 function checkOtherMilestones(){
-  if(!state.milestoneAwarded) state.milestoneAwarded={};
+  ensureAchievementMonth();
   const bonusCount = countBonusChoreCompletions(state);
   [5,10,30].forEach(n=>{
     const key = "bonus_"+n;
-    if(bonusCount>=n && !state.milestoneAwarded[key]){
-      state.milestoneAwarded[key] = true;
+    if(bonusCount>=n && !state.achieved[key]){
+      state.achieved[key] = true;
       queueGachaDraw(`ボーナスお手伝い${n}回達成`);
     }
   });
-  const savings = getBucketBalance("savings");
+  const monthlySavings = getMonthlyChoreSavings();
   [1000,3000,5000].forEach(n=>{
     const key = "savings_"+n;
-    if(savings>=n && !state.milestoneAwarded[key]){
-      state.milestoneAwarded[key] = true;
+    if(monthlySavings>=n && !state.achieved[key]){
+      state.achieved[key] = true;
       queueGachaDraw(`貯金箱${n.toLocaleString("ja-JP")}円達成`);
     }
   });
@@ -1206,6 +1232,7 @@ function checkOtherMilestones(){
    RENDER: HOME
 ========================================================================= */
 function renderHome(){
+  ensureAchievementMonth();
   const ds = todayStr();
   const log = getLog(ds);
   const savings = getBucketBalance("savings");
@@ -1238,7 +1265,7 @@ function renderHome(){
 
   // 今日のもくひょう金額（親が手動設定していればそちらを優先）と 今日かせいだ金額（進捗）
   if(g.dailyTargetOverride!=null && g.dailyTargetOverride>0) todayTarget = g.dailyTargetOverride;
-  const todayEarned = state.transactions.filter(t=>t.date===ds && t.type==="income").reduce((s,t)=>s+t.amount,0);
+  const todayEarned = state.transactions.filter(t=>t.date===ds && t.type==="income" && (t.source==="chore" || t.source==="emergency")).reduce((s,t)=>s+t.amount,0);
   document.getElementById("todayGoalAmt").textContent = todayTarget>0 ? fmtYen(todayTarget) : "未設定";
   document.getElementById("todayEarnedAmt").textContent = fmtYen(todayEarned);
   const todayPct = todayTarget>0 ? Math.min(100, Math.round(todayEarned/todayTarget*100)) : (todayEarned>0 ? 100 : 0);
@@ -1251,12 +1278,16 @@ function renderHome(){
 
   document.getElementById("qualGoalText").textContent = g.qualitative || "せっていから、かぞくでめざすことを書いてみよう";
 
-  // badges（連続ボーナスバッジ＋基本バッジ）
+  // badges（連続ボーナスバッジ＋基本バッジ）達成済みのものは非表示にする（はじめの一歩だけは恒久的に非表示）
+  if(!state.firstStepAchieved && isSetupComplete(state)){ state.firstStepAchieved = true; saveState(); }
   const br = document.getElementById("badgeRow"); br.innerHTML="";
-  [...BADGES, ...buildStreakBadges(), ...buildBonusCountBadges(), ...buildSavingsMilestoneBadges()].forEach(b=>{
-    const on = b.test(state);
+  const visibleBadges = [
+    ...(state.firstStepAchieved ? [] : BADGES),
+    ...buildStreakBadges(), ...buildBonusCountBadges(), ...buildSavingsMilestoneBadges()
+  ];
+  visibleBadges.forEach(b=>{
     const el = document.createElement("div");
-    el.className = "badge"+(on?" on":"");
+    el.className = "badge";
     el.innerHTML = `<div class="em">${b.em}</div><div class="t">${b.t}</div>`;
     br.appendChild(el);
   });
