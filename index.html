@@ -75,7 +75,6 @@ body{
 }
 .account-email{
   font-size:10.5px; color:var(--plum-soft); opacity:.8;
-  max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .topbar h1{
   font-size:20px; margin:0; font-family:'Kosugi Maru',sans-serif;
@@ -698,6 +697,7 @@ textarea{resize:vertical; min-height:70px;}
       <div class="topbar" style="padding-top:6px;"><h1>📋 お手伝いリスト</h1></div>
       <div style="margin:0 16px 12px;"><button class="btn btn-mint btn-block" id="btnAddChore">＋ 新しいお手伝いを追加</button></div>
       <div id="choreListWrap" style="padding:0 16px;"></div>
+      <div style="height:150px;"></div>
     </div>
 
     <!-- ---------------- LEDGER (お小遣い帖) ---------------- -->
@@ -739,6 +739,7 @@ textarea{resize:vertical; min-height:70px;}
         </div>
         <div class="ledger-group-body" id="expenseList"></div>
       </div>
+      <div style="height:150px;"></div>
     </div>
 
     <!-- ---------------- SETTINGS ---------------- -->
@@ -895,8 +896,9 @@ function updateAccountEmailLabel(user){
   const el = document.getElementById("accountEmailLabel");
   if(!el) return;
   if(fbEnabled && user && user.email){
-    el.textContent = user.email;
-    el.title = user.email;
+    const email = user.email;
+    el.textContent = email.length>8 ? email.slice(0,8)+"..." : email;
+    el.title = email;
     el.style.display = "block";
   } else {
     el.style.display = "none";
@@ -1778,11 +1780,13 @@ function saveWishlistItem(){
 function setGoalFromWishlist(id){
   const w = (state.wishlist||[]).find(x=>x.id===id);
   if(!w) return;
-  state.goal.subgoalName = w.name;
-  state.goal.subgoalAmount = w.amount;
-  if(w.deadline) state.goal.deadline = w.deadline;
-  saveState(); renderHome(); renderWishlistHome();
-  toast(`「${w.name}」を目標にしたよ！`);
+  openConfirmModal(`「${w.name}」を新しい目標にしますか？`, ()=>{
+    state.goal.subgoalName = w.name;
+    state.goal.subgoalAmount = w.amount;
+    if(w.deadline) state.goal.deadline = w.deadline;
+    saveState(); renderHome(); renderWishlistHome();
+    toast(`「${w.name}」を目標にしたよ！`);
+  }, "目標にする", false);
 }
 function markWishlistDone(id){
   const w = (state.wishlist||[]).find(x=>x.id===id);
