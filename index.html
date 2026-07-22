@@ -881,6 +881,22 @@ try{
   }
 }catch(e){ console.warn("Firebase未設定のため、この端末内保存のみで動作します。", e); }
 
+let _syncErrorShown = false;
+function showSyncErrorModal(err){
+  if(_syncErrorShown) return;
+  _syncErrorShown = true;
+  const code = (err && err.code) || "unknown";
+  const msg = (err && err.message) || String(err);
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>⚠️ 同期エラー</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px 16px;">
+      <p style="font-size:13.5px; line-height:1.7;">他の端末とのデータ同期でエラーが発生しました。多くの場合、Firebase側の「Firestoreのセキュリティルール」の設定が原因です。開発者の方に、このエラー内容を伝えてください。</p>
+      <p style="font-size:11.5px; color:var(--plum-soft); background:#F7F2FA; padding:8px 10px; border-radius:10px; word-break:break-all;">エラー内容：${esc(code)}<br>${esc(msg)}</p>
+      <button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="closeModal()">閉じる</button>
+    </div>`;
+  openModal(html);
+}
 function attachFamilySync(uid){
   if(!fbEnabled || !db) return;
   familyDocRef = db.collection("families").doc(uid);
@@ -889,9 +905,9 @@ function attachFamilySync(uid){
     if(doc.exists){
       applyRemoteState(doc.data());
     } else {
-      familyDocRef.set(state).catch(e=>console.warn("初回アップロード失敗", e));
+      familyDocRef.set(state).catch(e=>{ console.warn("初回アップロード失敗", e); showSyncErrorModal(e); });
     }
-  }, err=>console.warn("同期エラー", err));
+  }, err=>{ console.warn("同期エラー", err); showSyncErrorModal(err); });
 }
 function updateAccountEmailLabel(user){
   const el = document.getElementById("accountEmailLabel");
@@ -1019,7 +1035,7 @@ function migrate(s){
 function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   if(fbEnabled && familyDocRef){
-    familyDocRef.set(state).catch(e=>console.warn("sync failed",e));
+    familyDocRef.set(state).catch(e=>{ console.warn("sync failed",e); showSyncErrorModal(e); });
   }
 }
 function cid(){ return Math.random().toString(36).slice(2,10); }
@@ -2721,7 +2737,21 @@ document.getElementById("btnEnter").onclick = ()=>{
   document.getElementById("screen-fblogin").style.display = "block";
 };
 
-function fbShowError(msg){ document.getElementById("fbLoginErr").textContent = msg; toast(msg); }
+function fbErrorMessage(e){
+  const code = e && e.code;
+  const map = {
+    "auth/email-already-in-use": "このメールアドレスは既に登録されています。上の「ログインする」からログインしてください。",
+    "auth/invalid-email": "メールアドレスの形式が正しくありません。",
+    "auth/user-not-found": "このメールアドレスのアカウントが見つかりません。「はじめてのかたはこちら」から作成してください。",
+    "auth/wrong-password": "パスワードが違います。",
+    "auth/invalid-credential": "メールアドレスまたはパスワードが違います。",
+    "auth/weak-password": "パスワードは6文字以上にしてください。",
+    "auth/network-request-failed": "通信エラーです。電波の良い場所でもう一度お試しください。",
+    "auth/too-many-requests": "試行回数が多すぎます。しばらくしてからもう一度お試しください。"
+  };
+  return map[code] || ((e&&e.message)||"エラーが発生しました");
+}
+function fbShowError(msg){ document.getElementById("fbLoginErr").textContent = msg; if(msg) toast(msg); }
 document.getElementById("btnFbSignIn").onclick = ()=>{
   const email = document.getElementById("fbEmailInput").value.trim();
   const pw = document.getElementById("fbPasswordInput").value;
@@ -2732,7 +2762,7 @@ document.getElementById("btnFbSignIn").onclick = ()=>{
     attachFamilySync(cred.user.uid);
     enterApp();
   }).catch(e=>{
-    fbShowError("ログインできませんでした："+(e.message||e.code));
+    fbShowError(fbErrorMessage(e));
   }).finally(()=>{ btnIn.disabled=false; btnUp.disabled=false; btnIn.textContent = origIn; });
 };
 document.getElementById("btnFbSignUp").onclick = ()=>{
@@ -2746,7 +2776,7 @@ document.getElementById("btnFbSignUp").onclick = ()=>{
     familyDocRef.set(state).catch(e=>console.warn(e));
     enterApp();
   }).catch(e=>{
-    fbShowError("作成できませんでした："+(e.message||e.code));
+    fbShowError(fbErrorMessage(e));
   }).finally(()=>{ btnIn.disabled=false; btnUp.disabled=false; btnUp.textContent = origUp; });
 };
 
