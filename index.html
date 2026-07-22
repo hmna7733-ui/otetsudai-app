@@ -1,0 +1,2683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ごほうびちょきん</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ごほうびちょきん">
+<meta name="theme-color" content="#FF6F91">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23FFC93C'/%3E%3Ctext x='50' y='68' font-size='55' text-anchor='middle' font-family='sans-serif'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+  Firebase (任意): 親子デバイス間で同期したい場合はここに自分の
+  Firebaseプロジェクトの設定を入れてください（他のアプリと同じ手順）。
+  未設定のままでも「この端末内保存（localStorage）」だけで
+  すべての機能がフル動作します。
+============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+:root{
+  --bg:#FFF8EE;
+  --card:#FFFFFF;
+  --coral:#FF6F91;
+  --coral-dark:#E24C74;
+  --coral-light:#FFE1E9;
+  --mint:#2FBFAE;
+  --mint-light:#DEF7F3;
+  --gold:#FFC93C;
+  --gold-dark:#E8A916;
+  --plum:#3D2C4E;
+  --plum-soft:#8C7B9B;
+  --line:#F1E5D6;
+  --danger:#FF4757;
+  --danger-light:#FFE3E5;
+  --success:#33C27F;
+  --shadow: 0 8px 24px rgba(61,44,78,0.08);
+  --radius: 22px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  font-family:'M PLUS Rounded 1c', sans-serif;
+  color:var(--plum);
+  min-height:100vh;
+  overscroll-behavior-y:contain;
+}
+.display{font-family:'Kosugi Maru', sans-serif;}
+#app{
+  max-width:480px;
+  margin:0 auto;
+  min-height:100vh;
+  background:var(--bg);
+  position:relative;
+  padding-bottom:96px;
+}
+.screen{display:none; animation:fadeIn .25s ease;}
+.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 20px 10px;
+}
+.topbar h1{
+  font-size:20px; margin:0; font-family:'Kosugi Maru',sans-serif;
+  display:flex; align-items:center; gap:6px;
+}
+.role-pill{
+  display:flex; align-items:center; gap:6px;
+  background:var(--card); border:2px solid var(--line);
+  border-radius:999px; padding:6px 12px 6px 8px;
+  font-size:12px; font-weight:700; color:var(--plum-soft);
+  cursor:pointer;
+}
+.role-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);}
+.role-pill.parent .dot{background:var(--coral);}
+
+/* ---------- Cards ---------- */
+.card{
+  background:var(--card); border-radius:var(--radius);
+  padding:18px; margin:0 16px 16px; box-shadow:var(--shadow);
+}
+.card h2{font-size:15px; margin:0 0 12px; color:var(--plum-soft); font-weight:700;}
+.section-label{
+  font-size:12px; font-weight:800; color:var(--plum-soft);
+  letter-spacing:.03em; margin:22px 20px 8px; display:flex; align-items:center; gap:6px;
+}
+
+/* ---------- Balance hero ---------- */
+.balance-hero{
+  margin:6px 16px 18px; padding:26px 20px;
+  border-radius:28px;
+  background:linear-gradient(150deg,var(--coral) 0%, #FF8FA8 55%, var(--gold) 130%);
+  color:#fff; position:relative; overflow:hidden; box-shadow:0 14px 30px rgba(255,111,145,0.35);
+}
+.mission-hero{
+  margin:6px 16px 18px; padding:26px 22px; border-radius:28px;
+  background:linear-gradient(155deg,#2A1E38 0%, #5A3E73 45%, #FF6F91 100%, #FFC93C 150%);
+  color:#fff; position:relative; overflow:hidden;
+  box-shadow:0 18px 36px rgba(61,44,78,.4);
+}
+.mission-hero::before{content:"🌟"; position:absolute; right:-14px; top:-20px; font-size:100px; opacity:.13; transform:rotate(12deg);}
+.mission-hero .mh-label{
+  font-size:11.5px; font-weight:800; letter-spacing:.04em; opacity:.85;
+  display:flex; align-items:center; gap:6px; text-transform:none;
+}
+.mission-hero .mh-text{
+  font-family:'Kosugi Maru',sans-serif; font-size:20px; font-weight:700; line-height:1.6; margin-top:10px;
+  text-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+.balance-hero .label{font-size:13px; font-weight:700; opacity:.92;}
+.balance-hero .amount{
+  font-family:'Kosugi Maru',sans-serif; font-size:44px; font-weight:700; margin:2px 0 14px;
+  display:flex; align-items:baseline; gap:4px;
+}
+.balance-hero .amount span{font-size:20px; font-weight:700;}
+.jar-row{display:flex; align-items:center; gap:14px;}
+.jar-wrap{flex-shrink:0;}
+.goal-mini{flex:1;}
+.goal-mini .name{font-size:13px; font-weight:700; margin-bottom:6px;}
+.progress-track{
+  background:rgba(255,255,255,.35); border-radius:999px; height:10px; overflow:hidden;
+}
+.progress-fill{
+  background:#fff; height:100%; border-radius:999px; transition:width .6s cubic-bezier(.34,1.56,.64,1);
+}
+.goal-mini .sub{font-size:11px; margin-top:6px; opacity:.9;}
+
+/* ---------- Task cards ---------- */
+.task-group-title{
+  display:flex; align-items:center; gap:8px; margin:18px 20px 8px; font-size:13px; font-weight:800; color:var(--plum-soft);
+}
+.task-group-title .count{
+  background:var(--line); color:var(--plum); border-radius:999px; font-size:11px; padding:2px 9px;
+}
+.task-card{
+  display:flex; align-items:center; gap:12px;
+  background:var(--card); border-radius:18px; padding:14px 14px;
+  margin:0 16px 10px; box-shadow:var(--shadow); border:2px solid transparent;
+  transition:transform .15s ease;
+}
+.task-card.done{opacity:.5;}
+.task-card.emergency{background:var(--danger-light); border-color:var(--danger);}
+.task-card.optional{border-style:dashed; border-color:var(--line);}
+.task-emoji{font-size:26px; width:40px; text-align:center;}
+.task-info{flex:1; min-width:0;}
+.task-info .name{font-weight:700; font-size:14.5px;}
+.task-info .name.done-text{text-decoration:line-through;}
+.task-info .meta{font-size:11.5px; color:var(--plum-soft); margin-top:2px;}
+.task-info .tagrow{display:flex; gap:6px; margin-top:5px;}
+.tag{font-size:10px; font-weight:800; border-radius:999px; padding:2px 8px;}
+.tag.must{background:var(--coral-light); color:var(--coral-dark);}
+.tag.optional{background:var(--mint-light); color:var(--mint);}
+.tag.emergency{background:var(--danger); color:#fff;}
+.task-amount{font-family:'Kosugi Maru',sans-serif; font-weight:700; color:var(--gold-dark); font-size:15px; white-space:nowrap;}
+.check-btn{
+  width:34px; height:34px; border-radius:50%; border:2.5px solid var(--line);
+  background:#fff; display:flex; align-items:center; justify-content:center; font-size:16px;
+  cursor:pointer; flex-shrink:0;
+}
+.check-btn.checked{background:var(--success); border-color:var(--success); color:#fff;}
+.empty-note{margin:8px 20px 4px; font-size:13px; color:var(--plum-soft);}
+
+/* ---------- Buttons ---------- */
+.btn{
+  border:none; border-radius:16px; padding:13px 18px; font-weight:800; font-size:14.5px;
+  font-family:'M PLUS Rounded 1c',sans-serif; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+}
+.btn-primary{background:var(--coral); color:#fff; box-shadow:0 6px 16px rgba(255,111,145,.35);}
+.btn-mint{background:var(--mint); color:#fff; box-shadow:0 6px 16px rgba(47,191,174,.3);}
+.btn-gold{background:var(--gold); color:#5A4200; box-shadow:0 6px 16px rgba(255,201,60,.35);}
+.btn-outline{background:#fff; color:var(--plum); border:2px solid var(--line);}
+.btn-danger{background:var(--danger); color:#fff;}
+.btn-block{width:100%;}
+.btn-sm{padding:9px 14px; font-size:13px; border-radius:12px;}
+.btn:active{transform:scale(.97);}
+.fab{
+  position:fixed; right:20px; bottom:104px; z-index:20;
+  width:56px; height:56px; border-radius:50%; background:var(--danger); color:#fff;
+  font-size:24px; box-shadow:0 10px 22px rgba(255,71,87,.45); border:none; cursor:pointer;
+}
+.fab-gift{
+  bottom:170px; background:linear-gradient(135deg,#FFD700,#B388FF); box-shadow:0 10px 22px rgba(179,136,255,.45);
+}
+
+/* ---------- Bottom nav ---------- */
+.tabbar{
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:100%; max-width:480px; background:#fff; border-top:1px solid var(--line);
+  display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  box-shadow:0 -6px 20px rgba(61,44,78,.06); z-index:15;
+}
+.tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+  background:none; border:none; padding:6px 2px; color:var(--plum-soft); font-size:10.5px; font-weight:700;
+  cursor:pointer;
+}
+.tab .ic{font-size:20px;}
+.tab.active{color:var(--coral);}
+
+/* ---------- Forms ---------- */
+label.f{display:block; font-size:12.5px; font-weight:800; color:var(--plum-soft); margin:14px 0 6px;}
+label.f:first-child{margin-top:0;}
+input[type=text], input[type=number], input[type=date], select, textarea{
+  width:100%; border:2px solid var(--line); border-radius:14px; padding:11px 13px; font-size:14.5px;
+  font-family:'M PLUS Rounded 1c',sans-serif; background:#FFFCF8; color:var(--plum);
+}
+textarea{resize:vertical; min-height:70px;}
+.chip-row{display:flex; flex-wrap:wrap; gap:8px;}
+.chip{
+  border:2px solid var(--line); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700;
+  background:#fff; color:var(--plum-soft); cursor:pointer;
+}
+.chip.sel{background:var(--coral); border-color:var(--coral); color:#fff;}
+.weekday-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+.weekday-grid .chip{padding:8px 0; text-align:center; font-size:12px;}
+
+/* ---------- Chore list rows ---------- */
+.chore-row{
+  display:flex; align-items:center; gap:10px; background:#fff; border-radius:16px;
+  padding:12px 14px; margin-bottom:8px; box-shadow:var(--shadow);
+}
+.chore-row .name{font-weight:700; font-size:14px;}
+.chore-row .meta{font-size:11.5px; color:var(--plum-soft); margin-top:2px;}
+.chore-row .amt{font-family:'Kosugi Maru',sans-serif; color:var(--gold-dark); font-weight:700;}
+.icon-btn{background:var(--bg); border:none; border-radius:10px; width:32px; height:32px; font-size:14px; cursor:pointer;}
+
+/* ---------- Ledger / wallet ---------- */
+.wallet-card{
+  margin:6px 16px 18px; padding:22px; border-radius:26px; text-align:center;
+  background:linear-gradient(160deg,#3D2C4E,#5A3E73); color:#fff; box-shadow:var(--shadow);
+}
+.wallet-card .amt{font-family:'Kosugi Maru',sans-serif; font-size:38px; font-weight:700; margin:6px 0 2px;}
+
+/* 財布・貯金箱：2カード横並び（ホーム／おこづかい帖 共通デザイン） */
+.money-row{display:flex; gap:10px; margin:6px 16px 18px;}
+.money-card{
+  flex:1; min-width:0; border-radius:24px; padding:16px 13px 15px; color:#fff; position:relative; overflow:hidden;
+}
+.money-card.wallet{background:linear-gradient(155deg,#2FBFAE 0%, #56D6C6 55%, #BFF3EA 130%); box-shadow:0 12px 26px rgba(47,191,174,.32);}
+.money-card.savings{background:linear-gradient(150deg,var(--coral) 0%, #FF8FA8 55%, var(--gold) 130%); box-shadow:0 12px 26px rgba(255,111,145,.32);}
+.money-card .mc-label{font-size:11px; font-weight:800; opacity:.9; display:flex; align-items:center; gap:4px; white-space:nowrap;}
+.money-card .mc-amount{
+  font-family:'Kosugi Maru',sans-serif; font-weight:700; margin:5px 0 0;
+  white-space:nowrap; overflow:hidden; text-overflow:clip;
+  font-size:clamp(18px, 6.2vw, 27px);
+  letter-spacing:-.02em;
+  text-shadow:0 2px 6px rgba(0,0,0,.15);
+  line-height:1.1;
+}
+.money-card .mc-amount span{font-size:.55em; font-weight:700; margin-left:1px;}
+.money-card .mc-sub{font-size:10px; opacity:.9; margin-top:4px;}
+.money-card .mc-jar{margin:6px 0 0; display:flex; justify-content:center; transform:scale(.85); transform-origin:center top;}
+.money-card .mc-wallet-icon{font-size:24px; text-align:center; margin:6px 0 0; filter:drop-shadow(0 3px 6px rgba(0,0,0,.15));}
+.money-card.wallet{position:relative;}
+.money-card.wallet::after{content:"👛"; position:absolute; right:-14px; bottom:-18px; font-size:56px; opacity:.14; transform:rotate(-10deg); pointer-events:none;}
+.money-card .mc-goal-name{font-size:10px; font-weight:800; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.money-card .mc-goal-sub{font-size:9px; margin-top:4px; opacity:.9; line-height:1.35;}
+.progress-track.sm{height:6px;}
+
+.today-progress-card{
+  margin:0 16px 18px; border-radius:24px; overflow:hidden; position:relative;
+  background:linear-gradient(135deg,#241C36 0%, #3D2C4E 55%, #6B3F73 100%);
+  padding:16px 16px 18px; color:#fff;
+  box-shadow:0 14px 30px rgba(36,28,54,.4);
+}
+.today-progress-card::after{content:"🎯"; position:absolute; right:-10px; bottom:-16px; font-size:80px; opacity:.10; transform:rotate(-8deg); pointer-events:none;}
+.tp-head{font-size:11.5px; font-weight:800; opacity:.85; letter-spacing:.03em; display:flex; align-items:center; gap:5px;}
+.tp-row{display:flex; margin-top:12px; border-radius:16px; overflow:hidden; background:rgba(255,255,255,.08);}
+.tp-box{flex:1; padding:12px 14px;}
+.tp-box.target{border-right:1px solid rgba(255,255,255,.14);}
+.tp-label{font-size:10.5px; font-weight:800; opacity:.8;}
+.tp-val{font-family:'Kosugi Maru',sans-serif; font-size:21px; font-weight:700; margin-top:4px;}
+.tp-box.target .tp-val{color:#FFD37C;}
+.tp-box.earned .tp-val{color:#7CFFC4;}
+.tp-track{background:rgba(255,255,255,.16); border-radius:99px; height:9px; margin-top:14px; overflow:hidden;}
+.tp-fill{background:linear-gradient(90deg,#2FBFAE,#7CFFC4); height:100%; border-radius:99px; transition:width .6s cubic-bezier(.34,1.56,.64,1);}
+.tp-caption{font-size:10.5px; opacity:.8; margin-top:6px; text-align:right;}
+
+/* 今月がんばった／つかったお金 */
+.month-stat-row{display:flex; gap:10px; margin:14px 16px 0;}
+.month-stat-card{flex:1; border-radius:20px; padding:14px 14px; position:relative; overflow:hidden; box-shadow:var(--shadow);}
+.month-stat-card.earn{background:linear-gradient(155deg,#FFC93C 0%,#FFDD82 100%); color:#5A4200;}
+.month-stat-card.spend{background:linear-gradient(155deg,#FF95A8 0%,#FFC7D2 100%); color:#7A2C3E;}
+.month-stat-card .msc-emoji{position:absolute; right:10px; top:10px; font-size:22px; opacity:.4;}
+.month-stat-card .msc-label{font-size:11.5px; font-weight:800;}
+.month-stat-card .msc-value{font-family:'Kosugi Maru',sans-serif; font-size:19px; font-weight:700; margin-top:4px;}
+
+/* つかったお金を記録する（やさしい赤） */
+.btn-softred{background:linear-gradient(135deg,#FF95A8,#FFB9C6); color:#7A2C3E; box-shadow:0 8px 20px rgba(255,149,168,.4);}
+.softred-banner{background:#FFE9EE; border-radius:16px; padding:12px 14px; margin-bottom:14px; font-size:12.5px; color:#B15068; font-weight:700;}
+.ledger-row{
+  display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line);
+}
+.ledger-row:last-child{border-bottom:none;}
+.ledger-row .ic{width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0;}
+.ledger-row.income .ic{background:var(--mint-light); color:var(--mint);}
+.ledger-row.expense .ic{background:var(--danger-light); color:var(--danger);}
+.ledger-row .memo{flex:1; font-size:13.5px; font-weight:700;}
+.ledger-row .date{font-size:11px; color:var(--plum-soft);}
+.ledger-row .amt{font-family:'Kosugi Maru',sans-serif; font-weight:700; font-size:14.5px;}
+.ledger-row.income .amt{color:var(--success);}
+.ledger-row.expense .amt{color:var(--danger);}
+.ledger-group-card{background:#fff; border-radius:18px; margin:0 16px 12px; box-shadow:var(--shadow); overflow:hidden;}
+.ledger-group-head{display:flex; justify-content:space-between; align-items:center; padding:14px 16px; font-weight:800; font-size:13.5px; cursor:pointer; color:var(--plum);}
+.ledger-group-body{padding:0 16px 8px;}
+.ledger-group-body.collapsed{display:none;}
+.chev{transition:transform .2s; color:var(--plum-soft); font-size:12px;}
+.chev.collapsed{transform:rotate(-90deg);}
+.ledger-row .row-actions{display:flex; gap:4px; margin-left:4px;}
+
+/* ---------- Badges / streak ---------- */
+.gacha-pending-banner{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin:0 16px 16px; padding:13px 16px; border-radius:20px;
+  background:linear-gradient(135deg,#FFD700,#FF6F91); color:#fff;
+  box-shadow:0 12px 26px rgba(255,111,145,.35);
+  animation:gpbPulse 1.6s ease-in-out infinite;
+}
+@keyframes gpbPulse{0%,100%{transform:scale(1);} 50%{transform:scale(1.015);}}
+.gpb-text{font-family:'Kosugi Maru',sans-serif; font-weight:700; font-size:13.5px;}
+.badge-section{display:flex; align-items:center; margin:0 0 4px;}
+.badge-section-label{
+  flex-shrink:0; width:60px; margin-left:16px; text-align:center;
+  font-family:'Kosugi Maru',sans-serif; font-size:11px; font-weight:700; line-height:1.3;
+  color:var(--coral-dark); transform:rotate(-3deg);
+}
+.badge-section-label .arrow{display:block; font-size:20px; margin-top:2px; animation:arrowBounce 1.4s ease-in-out infinite;}
+@keyframes arrowBounce{0%,100%{transform:translateX(0);} 50%{transform:translateX(4px);}}
+.badge-row{display:flex; gap:10px; overflow-x:auto; padding:2px 16px 4px 0; flex:1;}
+.badge{
+  flex-shrink:0; width:74px; text-align:center; background:#fff; border-radius:16px; padding:10px 6px;
+  box-shadow:var(--shadow); opacity:.35;
+}
+.badge.on{opacity:1;}
+.badge .em{font-size:26px;}
+.badge .t{font-size:10px; font-weight:800; margin-top:4px; color:var(--plum-soft);}
+
+/* ---------- Modal / lock overlay ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(61,44,78,.55); z-index:60;
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.overlay.top{align-items:flex-start;}
+.sheet{
+  width:100%; max-width:480px; background:var(--bg); border-radius:26px 26px 0 0;
+  max-height:92vh; overflow-y:auto; padding:22px 0 30px; animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+.sheet-handle{width:40px; height:5px; background:var(--line); border-radius:99px; margin:0 auto 14px;}
+.sheet-head{display:flex; justify-content:space-between; align-items:center; padding:0 20px 8px;}
+.sheet-head h3{margin:0; font-family:'Kosugi Maru',sans-serif; font-size:17px;}
+.close-x{background:var(--line); border:none; border-radius:50%; width:30px; height:30px; font-size:14px; cursor:pointer;}
+
+/* full lock screen (monthly reflection) */
+.lock-screen{
+  position:fixed; inset:0; background:var(--bg); z-index:70; overflow-y:auto;
+  padding-bottom:40px;
+}
+.lock-header{
+  background:linear-gradient(150deg,var(--plum),#5A3E73); color:#fff; padding:34px 22px 26px; text-align:center;
+  border-radius:0 0 28px 28px;
+}
+.lock-header .em{font-size:38px;}
+.lock-header h2{font-family:'Kosugi Maru',sans-serif; margin:6px 0 4px; font-size:20px;}
+.lock-header p{margin:0; font-size:13px; opacity:.9;}
+.stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 16px 16px;}
+.stat-box{background:#fff; border-radius:16px; padding:14px; box-shadow:var(--shadow); text-align:center;}
+.stat-box .v{font-family:'Kosugi Maru',sans-serif; font-size:21px; font-weight:700; color:var(--coral-dark);}
+.stat-box .l{font-size:11px; color:var(--plum-soft); font-weight:700; margin-top:2px;}
+.ai-box{
+  margin:0 16px 16px; background:#fff; border-radius:18px; padding:16px; box-shadow:var(--shadow);
+  border-left:5px solid var(--gold);
+}
+.ai-box .tag{display:inline-block; background:var(--gold); color:#5A4200; font-size:10.5px; font-weight:800; border-radius:999px; padding:3px 10px; margin-bottom:8px;}
+.ai-box p{margin:6px 0; font-size:13.5px; line-height:1.6;}
+.locked-banner{
+  margin:16px; background:var(--danger-light); border:2px dashed var(--danger); border-radius:16px;
+  padding:12px 14px; font-size:12.5px; color:var(--danger); font-weight:700;
+}
+
+/* toast */
+.toast{
+  position:fixed; left:50%; top:18px; transform:translateX(-50%); z-index:90;
+  background:var(--plum); color:#fff; padding:11px 20px; border-radius:999px; font-size:13.5px; font-weight:700;
+  box-shadow:0 10px 24px rgba(0,0,0,.2); opacity:0; pointer-events:none; transition:.25s;
+}
+.toast.show{opacity:1; top:26px;}
+
+/* coin burst */
+.coin-burst{position:fixed; z-index:80; font-size:22px; pointer-events:none; animation:burst .9s ease forwards;}
+@keyframes burst{
+  0%{transform:translateY(0) scale(0.6); opacity:1;}
+  70%{opacity:1;}
+  100%{transform:translateY(-90px) scale(1.1); opacity:0;}
+}
+
+/* ---------------- ガチャガチャ（カプセルマシン）演出 ---------------- */
+.gm-wrap{position:relative; width:200px; margin:6px auto 4px; text-align:center;}
+.gm-dome{
+  width:150px; height:120px; margin:0 auto; border-radius:50% 50% 46% 46% / 62% 62% 38% 38%;
+  background:radial-gradient(circle at 35% 28%, rgba(255,255,255,.9), rgba(255,255,255,.15) 42%, rgba(150,190,255,.35) 100%), linear-gradient(180deg,#CDE9FF,#8FCBFF);
+  border:4px solid #fff; box-shadow:0 8px 20px rgba(0,0,0,.18), inset 0 -10px 18px rgba(0,80,180,.18);
+  position:relative; overflow:hidden;
+}
+.gm-dome.shaking{animation:gmShake .48s ease-in-out 8;}
+@keyframes gmShake{0%,100%{transform:translateX(0) rotate(0);} 25%{transform:translateX(-4px) rotate(-2deg);} 75%{transform:translateX(4px) rotate(2deg);}}
+.gm-capsules{font-size:20px; line-height:1.5; padding:10px 6px; letter-spacing:1px;}
+.gm-base{
+  width:164px; height:50px; margin:0 auto; background:linear-gradient(180deg,#FF6F91,#E24C74);
+  border-radius:16px; position:relative; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 18px rgba(0,0,0,.2);
+}
+.gm-slot{width:58px; height:13px; background:#3D2C4E; border-radius:8px;}
+.gm-handle{position:absolute; right:-24px; top:6px; width:38px; height:38px;}
+.gm-handle-arm{
+  position:absolute; top:16px; left:-16px; width:24px; height:7px;
+  background:linear-gradient(90deg,#DDE3EA,#9AA5B1); border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.3);
+}
+.gm-handle-grip{
+  width:38px; height:38px; border-radius:50%;
+  background:radial-gradient(circle at 32% 28%, #FFF3C4, #FFC93C 55%, #C6890A 100%);
+  border:3px solid #fff; box-shadow:0 4px 10px rgba(0,0,0,.32), inset 0 -3px 5px rgba(0,0,0,.2);
+  position:relative;
+}
+.gm-handle-grip::after{content:""; position:absolute; top:5px; left:9px; width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.75);}
+.gm-handle.turning{animation:gmHandleSpin .48s cubic-bezier(.36,1.4,.6,1) 8;}
+@keyframes gmHandleSpin{from{transform:rotate(0deg);} to{transform:rotate(360deg);}}
+.gm-capsule-drop{position:absolute; left:50%; top:112px; transform:translateX(-50%) scale(0); font-size:32px; opacity:0;}
+.gm-capsule-drop.drop{animation:gmDrop 1s cubic-bezier(.34,1.1,.64,1) forwards;}
+@keyframes gmDrop{
+  0%{transform:translateX(-50%) translateY(0) scale(0); opacity:0;}
+  10%{opacity:1;}
+  60%{transform:translateX(-50%) translateY(66px) scale(1.1);}
+  80%{transform:translateX(-50%) translateY(58px) scale(1.3) rotate(15deg);}
+  100%{transform:translateX(-50%) translateY(58px) scale(0); opacity:0;}
+}
+.gacha-rank-reveal{position:relative; margin-top:14px; opacity:0;}
+.gacha-rank-reveal::before{
+  content:""; position:absolute; top:38%; left:50%; width:10px; height:10px;
+  transform:translate(-50%,-50%) scale(0); border-radius:50%;
+  background:radial-gradient(circle, rgba(255,215,0,.65), rgba(255,111,145,.35) 55%, rgba(255,215,0,0) 75%);
+  z-index:-1; pointer-events:none;
+}
+.gacha-rank-reveal.show{opacity:1;}
+.gacha-rank-reveal.show::before{animation:gachaFlash .7s ease-out forwards;}
+@keyframes gachaFlash{
+  0%{transform:translate(-50%,-50%) scale(0); opacity:1;}
+  100%{transform:translate(-50%,-50%) scale(26); opacity:0;}
+}
+.grr-burst{
+  font-family:'Kosugi Maru',sans-serif; font-size:15px; font-weight:700; color:var(--coral-dark);
+  opacity:0; margin-bottom:2px;
+}
+.gacha-rank-reveal.show .grr-burst{animation:grrBurstPop .5s ease-out forwards;}
+@keyframes grrBurstPop{
+  0%{opacity:0; transform:scale(.3) translateY(10px);}
+  60%{opacity:1; transform:scale(1.3) translateY(0);}
+  100%{opacity:1; transform:scale(1) translateY(0);}
+}
+.grr-badge{
+  display:inline-block; font-family:'Kosugi Maru',sans-serif; font-weight:700; font-size:24px;
+  padding:8px 26px; border-radius:999px; color:#fff; margin-bottom:8px; box-shadow:0 8px 20px rgba(0,0,0,.3);
+  opacity:0; transform:scale(.2) rotate(-10deg);
+}
+.gacha-rank-reveal.show .grr-badge{animation:grrBadgeBang .55s cubic-bezier(.17,.89,.32,1.49) .12s forwards;}
+@keyframes grrBadgeBang{
+  0%{opacity:0; transform:scale(.2) rotate(-10deg);}
+  60%{opacity:1; transform:scale(1.3) rotate(4deg);}
+  80%{transform:scale(.92) rotate(-2deg);}
+  100%{opacity:1; transform:scale(1) rotate(0deg);}
+}
+.grr-amount{
+  font-family:'Kosugi Maru',sans-serif; font-size:34px; font-weight:700; color:var(--gold-dark);
+  opacity:0; transform:scale(.4);
+  text-shadow:0 3px 0 rgba(255,255,255,.6);
+}
+.gacha-rank-reveal.show .grr-amount{animation:grrAmountBang .55s cubic-bezier(.17,.89,.32,1.49) .28s forwards;}
+@keyframes grrAmountBang{
+  0%{opacity:0; transform:scale(.4);}
+  60%{opacity:1; transform:scale(1.25);}
+  100%{opacity:1; transform:scale(1);}
+}
+.grr-sub{font-size:11.5px; color:var(--plum-soft); font-weight:700; margin-top:4px; opacity:0;}
+.gacha-rank-reveal.show .grr-sub{animation:popIn .3s ease .5s forwards;}
+.rank-LR{background:linear-gradient(135deg,#FFD700,#FF8C00);}
+.rank-UR{background:linear-gradient(135deg,#B388FF,#7C4DFF);}
+.rank-SSR{background:linear-gradient(135deg,#FF6F91,#E24C74);}
+.rank-SR{background:linear-gradient(135deg,#4ECDC4,#2FBFAE);}
+.rank-R{background:linear-gradient(135deg,#8C7B9B,#6B5B7C);}
+.wheel-legend{display:flex; flex-wrap:wrap; gap:7px; justify-content:center; align-items:center; margin-top:10px;}
+.wheel-legend .item{
+  display:flex; align-items:center; gap:5px; font-size:11px; font-weight:700; background:#fff; color:var(--plum);
+  border-radius:999px; padding:4px 10px 4px 4px; box-shadow:var(--shadow);
+}
+.wheel-legend .item.size-LR{font-size:16px; font-weight:800; padding:8px 18px 8px 7px; box-shadow:0 6px 14px rgba(255,140,0,.35);}
+.wheel-legend .item.size-UR{font-size:14px; font-weight:800; padding:7px 15px 7px 6px;}
+.wheel-legend .item.size-SSR{font-size:12.5px; font-weight:700;}
+.wheel-legend .item.size-SR{font-size:11px;}
+.wheel-legend .item.size-R{font-size:9.5px; opacity:.75;}
+.grade-tag{display:inline-block; font-size:9.5px; font-weight:800; color:#fff; padding:2px 8px; border-radius:999px;}
+.wheel-legend .item.size-LR .grade-tag{font-size:11px; padding:3px 10px;}
+.wheel-legend .item.size-UR .grade-tag{font-size:10px; padding:2.5px 9px;}
+.gacha-result{font-family:'Kosugi Maru',sans-serif; font-size:32px; font-weight:700; color:var(--gold-dark); margin-top:16px; opacity:0;}
+.gacha-result.show{animation:popIn .4s ease forwards;}
+@keyframes popIn{from{transform:scale(.5); opacity:0;} to{transform:scale(1); opacity:1;}}
+.gacha-prize-row{display:flex; align-items:center; gap:8px; background:#fff; border-radius:14px; padding:10px 12px; margin-bottom:8px; box-shadow:var(--shadow);}
+.gacha-prize-row input{flex:1;}
+
+.hr-space{height:6px;}
+.row-between{display:flex; align-items:center; justify-content:space-between;}
+.small-link{font-size:12px; color:var(--plum-soft); font-weight:700; text-decoration:underline; background:none; border:none; cursor:pointer;}
+.pill-select{display:flex; background:var(--bg); border-radius:14px; padding:4px;}
+.pill-select button{flex:1; border:none; background:none; padding:9px; border-radius:11px; font-weight:800; font-size:13px; color:var(--plum-soft); cursor:pointer;}
+.pill-select button.active{background:#fff; color:var(--coral); box-shadow:var(--shadow);}
+
+/* login */
+.login-wrap{min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:30px;}
+.login-logo{text-align:center; margin-bottom:26px;}
+.login-logo .em{font-size:54px;}
+.login-logo h1{font-family:'Kosugi Maru',sans-serif; font-size:24px; margin:8px 0 2px;}
+.login-logo p{font-size:12.5px; color:var(--plum-soft); margin:0;}
+.role-card{
+  display:flex; align-items:center; gap:14px; background:#fff; border-radius:20px; padding:16px;
+  box-shadow:var(--shadow); margin-bottom:12px; border:2.5px solid transparent; cursor:pointer;
+}
+.role-card.sel{border-color:var(--coral);}
+.role-card .em{font-size:30px;}
+.role-card .t{font-weight:800; font-size:15px;}
+.role-card .d{font-size:11.5px; color:var(--plum-soft);}
+.bell-wrap{position:relative; font-size:19px; cursor:pointer;}
+.bell-badge{
+  position:absolute; top:-5px; right:-7px; background:var(--danger); color:#fff; font-size:9px; font-weight:800;
+  border-radius:999px; min-width:16px; height:16px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ LOGIN / ROLE SELECT ============ -->
+  <div id="screen-login" class="screen active">
+    <div class="login-wrap">
+      <div class="login-logo">
+        <div class="em">🐷💰</div>
+        <h1>ごほうびちょきん</h1>
+        <p>おてつだいをして　ゆめを　かなえよう</p>
+      </div>
+      <div id="loginBox">
+        <label class="f">かぞくの名前（表示用）</label>
+        <input type="text" id="familyNameInput" placeholder="例：やまだ家">
+        <label class="f">この端末は　だれが　つかいますか？</label>
+        <div class="role-card" id="pickChildDevice">
+          <div class="em">🧒</div>
+          <div><div class="t">こどもの端末</div><div class="d">お手伝いの記録だけ。せってい・削除・モード切り替えはできません</div></div>
+        </div>
+        <div class="role-card" id="pickParentDevice">
+          <div class="em">👩‍👧</div>
+          <div><div class="t">保護者の端末</div><div class="d">せってい・削除・見まもりダッシュボードなど、すべて操作できます</div></div>
+        </div>
+
+        <div id="parentPassWrap" style="display:none;">
+          <label class="f">かくにん用パスワードを作る（4文字以上）</label>
+          <input type="password" id="newPassInput" placeholder="例：oyako2024">
+          <label class="f">もう一度入力</label>
+          <input type="password" id="newPassInput2">
+          <p style="font-size:11px; color:var(--plum-soft); margin:6px 0 0;">※「こども視点から戻るとき」「月末ふりかえりを終えるとき」に使います。こどもの端末にも同じものを控えておいてください。</p>
+        </div>
+        <div id="childPassWrap" style="display:none;">
+          <label class="f">保護者と同じ「かくにん用パスワード」（分かれば入力・あとからでもOK）</label>
+          <input type="password" id="childKnownPassInput">
+        </div>
+
+        <button class="btn btn-primary btn-block" id="btnEnter" style="margin-top:14px;">はじめる</button>
+        <p style="text-align:center; font-size:11px; color:var(--plum-soft); margin-top:14px;" id="loginFooterNote">※データはこの端末に保存されます。複数端末で同期したい場合は設定からFirebase連携をご利用ください（開発者向け）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FIREBASE LOGIN (家族共通のメールアドレス＋パスワード) ============ -->
+  <div id="screen-fblogin" class="screen" style="display:none;">
+    <div class="login-wrap">
+      <div class="login-logo">
+        <div class="em">👨‍👩‍👧‍👦🔗</div>
+        <h1>かぞくで同期</h1>
+        <p>同じアドレス・パスワードの端末どうしが<br>リアルタイムでつながります</p>
+      </div>
+      <div>
+        <label class="f">メールアドレス</label>
+        <input type="text" id="fbEmailInput" placeholder="family@example.com" autocapitalize="off">
+        <label class="f">パスワード（6文字以上）</label>
+        <input type="password" id="fbPasswordInput">
+        <div id="fbLoginErr" style="color:var(--danger); font-size:12px; margin-top:8px;"></div>
+        <button class="btn btn-primary btn-block" style="margin-top:14px;" id="btnFbSignIn">ログインする</button>
+        <button class="btn btn-outline btn-block" style="margin-top:10px;" id="btnFbSignUp">はじめてのかたはこちら（アカウントを作る）</button>
+        <p style="text-align:center; font-size:11px; color:var(--plum-soft); margin-top:14px;">※他の端末（パパ・ママ・こども）でも、同じメールアドレスとパスワードでログインしてください。ちがう家族は、ちがうメールアドレスでログインすれば、データはまざりません。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MAIN APP ============ -->
+  <div id="mainApp" style="display:none;">
+
+    <div class="topbar">
+      <h1 id="familyNameShow">🐷 ごほうびちょきん</h1>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="bell-wrap" id="bellWrap" style="display:none;" onclick="openNotifications()">🔔<span class="bell-badge" id="bellBadge" style="display:none;">0</span></div>
+        <div class="role-pill" id="rolePill"><span class="dot"></span><span id="roleLabel">こども</span></div>
+      </div>
+    </div>
+
+    <!-- ---------------- HOME ---------------- -->
+    <div class="screen active" id="screen-home">
+
+      <div class="mission-hero" id="qualGoalCard">
+        <div class="mh-label">🌟 なんのために がんばっているか</div>
+        <div class="mh-text" id="qualGoalText">まだ設定されていません</div>
+      </div>
+
+      <div class="money-row">
+        <div class="money-card wallet">
+          <div class="mc-label">👛 財布</div>
+          <div class="mc-amount" id="homeWalletAmt">0<span>円</span></div>
+          <div class="mc-sub">いま つかえるお金</div>
+          <div class="mc-wallet-icon">👛</div>
+        </div>
+        <div class="money-card savings">
+          <div class="mc-label">🏦 貯金箱</div>
+          <div class="mc-amount" id="balanceAmount">0<span>円</span></div>
+          <div class="mc-jar"><svg id="jarSvg" width="44" height="52" viewBox="0 0 54 64"></svg></div>
+          <div class="mc-goal-name" id="subgoalName">ほしいものを設定しよう</div>
+          <div class="progress-track sm"><div class="progress-fill" id="goalProgressFill" style="width:0%"></div></div>
+          <div class="mc-goal-sub" id="goalSubText">せっていから目標をきめてね</div>
+        </div>
+      </div>
+
+      <div class="today-progress-card">
+        <div class="tp-row">
+          <div class="tp-box target"><div class="tp-label">🎯 今日のもくひょう</div><div class="tp-val" id="todayGoalAmt">0円</div></div>
+          <div class="tp-box earned"><div class="tp-label">💪 今日がんばった金額</div><div class="tp-val" id="todayEarnedAmt">0円</div></div>
+        </div>
+        <div class="tp-track"><div class="tp-fill" id="todayProgressFill" style="width:0%"></div></div>
+        <div class="tp-caption" id="todayProgressCaption"></div>
+      </div>
+
+      <div class="gacha-pending-banner" id="gachaPendingBanner" style="display:none;">
+        <div class="gpb-text">🎁 ガチャガチャが <span id="gachaPendingCount">0</span>回 引けるよ！</div>
+        <button class="btn btn-gold btn-sm" id="btnDrawGacha">ガチャを引く</button>
+      </div>
+
+      <div class="badge-section">
+        <div class="badge-section-label">ラッキーボーナスチャンス<span class="arrow">👉</span></div>
+        <div class="badge-row" id="badgeRow"></div>
+      </div>
+
+      <div id="emergencySection"></div>
+
+      <div class="task-group-title">🔥 きょう ぜったいやる <span class="count" id="mustCount">0</span></div>
+      <div id="mustTaskList"></div>
+
+      <div class="task-group-title">✨ やってもいい（ボーナス） <span class="count" id="optCount">0</span></div>
+      <div id="optTaskList"></div>
+      <div style="margin:2px 16px 4px;"><button class="btn btn-mint btn-block" id="btnAddBonusToday">✨ ほかのお手伝いもやる</button></div>
+
+      <div class="ledger-group-card" style="margin:16px 16px 12px;">
+        <div class="ledger-group-head" onclick="toggleWishlistGroup()">
+          <span>🎁 ほしいものリスト</span>
+          <span class="chev" id="wishlistChev">▾</span>
+        </div>
+        <div class="ledger-group-body" id="wishlistBody">
+          <div id="wishlistList"></div>
+          <button class="btn btn-outline btn-sm btn-block" style="margin-top:8px;" id="btnAddWishlistItem">＋ ほしいものを追加</button>
+        </div>
+      </div>
+
+      <div class="empty-note" id="allDoneNote" style="display:none;">🎉 今日のタスクぜんぶ終わったよ！すごい！</div>
+    </div>
+
+    <!-- ---------------- CHORES (お手伝いリスト管理) ---------------- -->
+    <div class="screen" id="screen-chores">
+      <div class="topbar" style="padding-top:6px;"><h1>📋 お手伝いリスト</h1></div>
+      <div style="margin:0 16px 12px;"><button class="btn btn-mint btn-block" id="btnAddChore">＋ 新しいお手伝いを追加</button></div>
+      <div id="choreListWrap" style="padding:0 16px;"></div>
+    </div>
+
+    <!-- ---------------- LEDGER (お小遣い帖) ---------------- -->
+    <div class="screen" id="screen-ledger">
+      <div class="topbar" style="padding-top:6px;"><h1>👛 おこづかい帖</h1></div>
+      <div class="money-row">
+        <div class="money-card wallet">
+          <div class="mc-label">👛 財布</div>
+          <div class="mc-amount" id="walletAmount">0<span>円</span></div>
+          <div class="mc-sub">いま つかえるお金</div>
+          <div class="mc-wallet-icon">👛</div>
+        </div>
+        <div class="money-card savings">
+          <div class="mc-label">🏦 貯金箱</div>
+          <div class="mc-amount" id="savingsAmount">0<span>円</span></div>
+          <div class="mc-jar"><svg id="savingsJar" width="44" height="52" viewBox="0 0 54 64"></svg></div>
+          <div class="mc-goal-name" id="ledgerGoalName">ほしいものを設定しよう</div>
+          <div class="progress-track sm"><div class="progress-fill" id="ledgerGoalFill" style="width:0%"></div></div>
+          <div class="mc-goal-sub" id="ledgerGoalSub">せっていから目標をきめてね</div>
+        </div>
+      </div>
+      <div class="month-stat-row">
+        <div class="month-stat-card earn"><div class="msc-emoji">💪</div><div class="msc-label">今月がんばったお金</div><div class="msc-value" id="monthIncome">0円</div></div>
+        <div class="month-stat-card spend"><div class="msc-emoji">🛍️</div><div class="msc-label">今月つかったお金</div><div class="msc-value" id="monthExpense">0円</div></div>
+      </div>
+      <div style="margin:14px 16px 0;"><button class="btn btn-softred btn-block" id="btnAddExpense">💸 つかったお金を記録する</button></div>
+      <div class="section-label">📜 りれき</div>
+      <div class="ledger-group-card">
+        <div class="ledger-group-head" onclick="toggleLedgerGroup('income')">
+          <span>➕ かせいだお金の記録</span>
+          <span class="chev" id="incomeChev">▾</span>
+        </div>
+        <div class="ledger-group-body" id="incomeList"></div>
+      </div>
+      <div class="ledger-group-card">
+        <div class="ledger-group-head" onclick="toggleLedgerGroup('expense')">
+          <span>➖ つかったお金の記録</span>
+          <span class="chev" id="expenseChev">▾</span>
+        </div>
+        <div class="ledger-group-body" id="expenseList"></div>
+      </div>
+    </div>
+
+    <!-- ---------------- SETTINGS ---------------- -->
+    <div class="screen" id="screen-settings">
+      <div class="topbar" style="padding-top:6px;"><h1>⚙️ せってい</h1></div>
+
+      <div class="card">
+        <h2>🌟 定性的な目標</h2>
+        <label class="f">かぞくで めざしていること</label>
+        <textarea id="qualGoalInput" placeholder="例：お母さんの負担を減らしたい／自分でできることを増やしたい"></textarea>
+        <label class="f">今いちばんほしいもの、やりたいこと</label>
+        <input type="text" id="subgoalNameInput" placeholder="例：あたらしいゲーム">
+        <label class="f">目標金額</label>
+        <input type="number" id="subgoalAmountInput" placeholder="例：5000">
+        <label class="f">いつまでに？（期限の月）</label>
+        <input type="date" id="subgoalDeadlineInput">
+        <label class="f">今日の目標金額（円）</label>
+        <input type="number" id="dailyTargetInput" placeholder="下の「目安！」を参考に入力してね">
+        <div id="dailyNeedPreview" class="empty-note" style="margin:10px 0 0;"></div>
+        <button class="btn btn-primary btn-block" style="margin-top:14px;" id="btnSaveGoal">目標を保存する</button>
+      </div>
+
+      <div class="card">
+        <h2>📅 週末ふりかえりの曜日</h2>
+        <label class="f">毎週なんようびに ふりかえりをする？（頻度が少ないと忘れがちなので毎週がおすすめ）</label>
+        <div class="weekday-grid" id="reflectionWeekdayGrid"></div>
+        <button class="btn btn-outline btn-block" style="margin-top:14px;" id="btnSaveReflectionDay">保存する</button>
+        <button class="btn btn-outline btn-block" style="margin-top:10px;" id="btnOpenReflectionHistory">📖 ふりかえりの履歴を見る</button>
+      </div>
+
+      <div class="card">
+        <h2>🏦 先取り貯金のルール</h2>
+        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">「固定額」は、その日にかせいだお金の合計から先取りする方式です。例：1日の目標を100円にした場合、50円＋70円のお手伝いをしたら、先に100円が貯金箱、残りの20円が財布に。そのあとさらに70円かせいだら、その70円は全部財布に入ります（目標に達するまでは貯金箱、超えたぶんは財布）。</p>
+        <div class="pill-select" id="srType">
+          <button type="button" data-v="fixed" onclick="pickSavingsType(this,'fixed')">固定額（円）</button>
+          <button type="button" data-v="percent" onclick="pickSavingsType(this,'percent')">割合（％）</button>
+        </div>
+        <label class="f" id="srValueLabel">1日に貯金箱へ入れる目標額（円）</label>
+        <input type="number" id="srValueInput">
+        <button class="btn btn-mint btn-block" style="margin-top:14px;" id="btnSaveSavingsRule">保存する</button>
+      </div>
+
+      <div class="card">
+        <h2>🎰 連続達成ボーナス（ガチャ）</h2>
+        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">「今日ぜったいやる」を全部やった日が連続で続いた日に、下のルーレットでボーナス金額が抽選されます。</p>
+        <label class="f">ボーナスガチャを回す連続日数</label>
+        <div class="chip-row" id="streakMilestoneRow">
+          <div class="chip" data-m="3" onclick="toggleMilestone(this,'3')">3日</div>
+          <div class="chip" data-m="7" onclick="toggleMilestone(this,'7')">7日</div>
+          <div class="chip" data-m="15" onclick="toggleMilestone(this,'15')">15日</div>
+          <div class="chip" data-m="30" onclick="toggleMilestone(this,'30')">1ヶ月</div>
+        </div>
+        <label class="f" style="margin-top:16px;">ルーレットの景品（金額と当選確率）</label>
+        <div id="gachaPrizeList"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:4px;" id="btnAddGachaPrize">＋ 景品をふやす</button>
+        <div id="gachaPercentTotal" class="empty-note" style="margin:10px 0 0;"></div>
+        <button class="btn btn-gold btn-block" style="margin-top:14px;" id="btnSaveGacha">保存する</button>
+        <button class="btn btn-mint btn-block" style="margin-top:10px;" id="btnTestGacha">🎰 試しにルーレットを回す</button>
+        <div id="gachaTestResult"></div>
+      </div>
+
+      <div class="card">
+        <h2>💰 財布・貯金箱の金額を設定</h2>
+        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">今の残高を直接書きかえたいときに使います（過去の記録はそのまま残り、差額だけが「残高調整」として記録されます）。</p>
+        <label class="f">👛 財布（つかえるお金）の金額</label>
+        <input type="number" id="setWalletInput">
+        <label class="f">🏦 貯金箱の金額</label>
+        <input type="number" id="setSavingsInput">
+        <button class="btn btn-outline btn-block" style="margin-top:14px;" id="btnSetBalances">この金額に設定する</button>
+      </div>
+
+      <div class="card">
+        <h2>🔑 かくにん用パスワード</h2>
+        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;" id="pwCardDesc">こども視点から戻るとき・月末ふりかえりを終えるときに使うパスワードです。</p>
+        <label class="f">新しいパスワード（4文字以上）</label>
+        <input type="password" id="newPwSetting1">
+        <label class="f">もう一度入力</label>
+        <input type="password" id="newPwSetting2">
+        <button class="btn btn-outline btn-block" style="margin-top:10px;" id="btnChangePassword">パスワードを変更する</button>
+        <button class="btn btn-outline btn-block" style="margin-top:10px; display:none;" id="btnFbSignOut">この端末でログアウトする</button>
+      </div>
+
+      <div class="card">
+        <h2>👨‍👩‍👧 おうちの人メニュー</h2>
+        <button class="btn btn-gold btn-block" id="btnOpenParentDash" style="margin-bottom:10px;">📊 見まもりダッシュボード</button>
+        <button class="btn btn-outline btn-block" id="btnOpenReflectionNow">🗓 いまふりかえりを見る（テスト用）</button>
+      </div>
+
+      <div class="card">
+        <h2>🔧 データ</h2>
+        <button class="btn btn-outline btn-block" id="btnExportData" style="margin-bottom:10px;">データをバックアップ（コピー）</button>
+        <button class="btn btn-danger btn-block" id="btnResetData">全部リセットする</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tabbar -->
+  <div class="tabbar" id="tabbar" style="display:none;"></div>
+
+  <!-- Gift gacha ticket FAB (parent only) -->
+  <button class="fab fab-gift" id="fabGiftGacha" style="display:none;">🎟️</button>
+
+  <!-- Emergency FAB (parent only) -->
+  <button class="fab" id="fabEmergency" style="display:none;">🚨</button>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ============ MODALS (built dynamically into #modalRoot) ============ -->
+<div id="modalRoot"></div>
+
+<script>
+/* =========================================================================
+   ごほうびちょきん — お手伝い・お小遣い管理アプリ
+   単一HTMLファイル / vanilla JS / localStorage（+ 任意でFirebase同期）
+========================================================================= */
+
+/* ---------------- Firebase (optional) ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDpRAf4R9lrXBbYH9PbtBITiCLHJYhIG44",
+  authDomain: "kodomo-okodukai.firebaseapp.com",
+  projectId: "kodomo-okodukai",
+  storageBucket: "kodomo-okodukai.firebasestorage.app",
+  messagingSenderId: "400449157725",
+  appId: "1:400449157725:web:6c952f9d0d95db2ca32bb4"
+};
+let fbEnabled = false, db = null, auth = null;
+let familyDocRef = null;
+let familyUnsub = null;
+try{
+  if(firebaseConfig.apiKey){
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    fbEnabled = true;
+  }
+}catch(e){ console.warn("Firebase未設定のため、この端末内保存のみで動作します。", e); }
+
+function attachFamilySync(uid){
+  if(!fbEnabled || !db) return;
+  familyDocRef = db.collection("families").doc(uid);
+  if(familyUnsub) familyUnsub();
+  familyUnsub = familyDocRef.onSnapshot(doc=>{
+    if(doc.exists()){
+      applyRemoteState(doc.data());
+    } else {
+      familyDocRef.set(state).catch(e=>console.warn("初回アップロード失敗", e));
+    }
+  }, err=>console.warn("同期エラー", err));
+}
+function applyRemoteState(remoteData){
+  const keepDeviceType = state.deviceType;
+  const keepRole = state.role;
+  state = migrate(remoteData);
+  state.deviceType = keepDeviceType;
+  state.role = keepRole;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if(document.getElementById("mainApp").style.display==="block") renderAll();
+}
+
+/* ---------------- Constants ---------------- */
+const STORAGE_KEY = "gohoubi_chokin_state_v2"; // v1から変更：次回起動時は必ず最初の端末選択画面からやり直せるようにするため
+const WEEKDAYS = ["日","月","火","水","木","金","土"];
+const CHORE_EMOJI = ["🧹","🧺","🍽️","🐕","🛏️","🗑️","🧽","🚿","📚","🛒","🪴","👕"];
+const BADGES = [
+  {id:"first", em:"🌱", t:"はじめの一歩", test:s=>isSetupComplete(s)},
+];
+function buildStreakBadges(){
+  const milestones = [3,7,15,30];
+  const emojis = {3:"🔥", 7:"🌟", 15:"👑", 30:"🏅"};
+  return milestones.map(m=>{
+    const on = (state.streakMilestones||{})[String(m)];
+    const label = m===30 ? "1ヶ月連続" : `${m}日連続`;
+    return {em:emojis[m], t: label + (on ? " 🎰ガチャ" : ""), test:s=>getStreak(s)>=m};
+  });
+}
+function buildBonusCountBadges(){
+  const milestones = [5,10,30];
+  const emojis = {5:"✨", 10:"🎉", 30:"👏"};
+  return milestones.map(m=> ({em:emojis[m], t:`ボーナスお手伝い${m}回 🎰`, test:s=>countBonusChoreCompletions(s)>=m}));
+}
+function buildSavingsMilestoneBadges(){
+  const milestones = [1000,3000,5000];
+  const emojis = {1000:"💰", 3000:"🏆", 5000:"👑"};
+  return milestones.map(m=> ({em:emojis[m], t:`貯金箱${m.toLocaleString("ja-JP")}円 🎰`, test:s=>getBucketBalance("savings", s)>=m}));
+}
+function countBonusChoreCompletions(s=state){
+  let count=0;
+  Object.keys(s.dailyLog||{}).forEach(ds=>{
+    const log = s.dailyLog[ds];
+    const extra = new Set(log.extraOptional||[]);
+    (log.completed||[]).forEach(id=>{
+      const chore = (s.chores||[]).find(c=>c.id===id);
+      if(extra.has(id) || (chore && chore.priority!=="must")) count++;
+    });
+  });
+  return count;
+}
+function isSetupComplete(s=state){
+  const g = s.goal||{};
+  const hasGoal = !!(g.qualitative && g.subgoalName && g.subgoalAmount>0 && g.deadline);
+  const hasChore = (s.chores||[]).length>0;
+  const hasSavingsRule = s.savingsRule && s.savingsRule.value>0;
+  const hasGachaPrizes = s.streakGacha && (s.streakGacha.prizes||[]).some(p=>p.percent>0 && p.amount>0);
+  return hasGoal && hasChore && hasSavingsRule && hasGachaPrizes;
+}
+
+/* ---------------- State ---------------- */
+function defaultState(){
+  return {
+    familyName:"わが家",
+    role:"child",
+    deviceType:"child", // "child" | "parent" — この端末の種類。子供用端末はモード切替・設定・削除が一切できない
+    parentPassword:"", // かくにん用パスワード（子供視点→保護者視点／月末ふりかえり終了で使用）
+    goal:{ qualitative:"", subgoalName:"", subgoalAmount:0, deadline:"", dailyTargetOverride:null },
+    chores:[
+      {id:cid(), name:"食器をさげる", emoji:"🍽️", amount:20, priority:"must", cycle:{type:"daily"}, condition:"食べ終わったらすぐ", lastDone:null},
+      {id:cid(), name:"お風呂そうじ", emoji:"🛁", amount:50, priority:"must", cycle:{type:"weekly", days:[1,4]}, condition:"夜ごはんの前に", lastDone:null},
+      {id:cid(), name:"ペットのお世話", emoji:"🐕", amount:30, priority:"optional", cycle:{type:"everyNDays", n:2}, condition:"", lastDone:null},
+    ],
+    dailyLog:{}, // date -> {completed:[choreId], emergencies:[{id,choreId,name,emoji,amount}]}
+    transactions:[], // {id,date,type,amount,memo,bucket:'savings'|'wallet'}
+    savingsRule:{type:"fixed", value:100}, // 先取り貯金ルール：fixedは「1日にいくらまで貯金箱に先取りするか」、percentは報酬の何割を貯金箱へ
+    streakMilestones:{"3":true, "7":true, "15":true, "30":true}, // どの連続日数でガチャを回すか
+    streakGacha:{ prizes:[
+      {amount:10, percent:50},
+      {amount:20, percent:30},
+      {amount:50, percent:10},
+      {amount:100, percent:5},
+      {amount:500, percent:1},
+    ]}, // 連続ボーナスガチャの景品（金額と当選確率％、合計100%に自動調整）
+    streakAwardedDates:{}, // milestone(日数) -> 直近で付与した日付。二重付与防止用
+    milestoneAwarded:{}, // "bonus_5"や"savings_1000"などのキー -> 一度きり付与済みフラグ
+    pendingGachaDraws:[], // {id,label,type:"achievement"|"gift"} -> 達成済み／プレゼント済みでまだ子供が引いていないガチャガチャ
+    giftAnnounced:[], // 子供にすでに「届いてます」を表示したガチャ券draw id
+    wishlist:[], // {id,name,amount,deadline,done,doneDate} -> ほしいものリスト
+    notifications:[], // {id,date,time,msg,read} — こどもがタスク完了した際に保護者へ知らせる
+    reflectionWeekday: 0, // 0=日,1=月,...6=土。毎週この曜日にふりかえりを行う
+    lastReflectionWeek: startOfWeek(new Date()), // pretend already reflected this week at install
+    reflections:{}, // weekKey(その週の月曜日) -> {good,bad,negotiation,confirmed,confirmedAt}
+  };
+}
+let state = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return migrate(JSON.parse(raw));
+  }catch(e){}
+  return defaultState();
+}
+function migrate(s){
+  const d = defaultState();
+  return Object.assign({}, d, s, {goal:Object.assign({},d.goal,s.goal||{})});
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if(fbEnabled && familyDocRef){
+    familyDocRef.set(state).catch(e=>console.warn("sync failed",e));
+  }
+}
+function cid(){ return Math.random().toString(36).slice(2,10); }
+
+/* ---------------- Date helpers ---------------- */
+function todayStr(d=new Date()){
+  const p=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function currentMonthKey(d=new Date()){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
+function daysInMonth(d=new Date()){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function startOfWeek(d=new Date()){
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = (day===0 ? 6 : day-1); // days since Monday
+  const monday = new Date(d);
+  monday.setDate(d.getDate()-diff);
+  return todayStr(monday);
+}
+function mondayIndex(jsDay){ return jsDay===0 ? 6 : jsDay-1; } // Monday=0 ... Sunday=6
+function fmtYen(n){ return (n||0).toLocaleString("ja-JP")+"円"; }
+
+/* ---------------- Chore scheduling ---------------- */
+function isChoreDueToday(chore, dateStr){
+  const d = new Date(dateStr);
+  const c = chore.cycle;
+  if(c.type==="daily") return true;
+  if(c.type==="weekly") return (c.days||[]).includes(d.getDay());
+  if(c.type==="everyNDays"){
+    if(!chore.lastDone) return true;
+    return daysBetween(chore.lastDone, dateStr) >= (c.n||1);
+  }
+  return true;
+}
+function cycleLabel(c){
+  if(c.type==="daily") return "毎日";
+  if(c.type==="weekly") return "週：" + (c.days||[]).map(i=>WEEKDAYS[i]).join("・");
+  if(c.type==="everyNDays") return `${c.n||1}日おき`;
+  return "";
+}
+
+/* ---------------- Derived data ---------------- */
+function getLog(dateStr){
+  if(!state.dailyLog[dateStr]) state.dailyLog[dateStr] = {completed:[], emergencies:[]};
+  return state.dailyLog[dateStr];
+}
+function getBucketBalance(bucket, s=state){
+  return (s.transactions||[]).filter(t=> (t.bucket||"wallet")===bucket)
+    .reduce((sum,t)=> sum + (t.type==="income"? t.amount : -t.amount), 0);
+}
+function getBalance(s=state){
+  return getBucketBalance("savings",s) + getBucketBalance("wallet",s);
+}
+function splitIncome(amount, ds){
+  ds = ds || todayStr();
+  const r = state.savingsRule || {type:"fixed", value:0};
+  let toSavings;
+  if(r.type==="fixed"){
+    // 先取り貯金：その日の合計金額のうち、貯金箱への「今日の目標額」に達するまでを先取りし、残りは財布へ
+    const threshold = Math.max(0, r.value||0);
+    const savingsSoFarToday = (state.transactions||[])
+      .filter(t=> t.date===ds && t.type==="income" && (t.bucket||"wallet")==="savings")
+      .reduce((s,t)=>s+t.amount, 0);
+    const remainingCapacity = Math.max(0, threshold - savingsSoFarToday);
+    toSavings = Math.min(amount, remainingCapacity);
+  } else {
+    toSavings = Math.round(amount * (Math.min(100,Math.max(0,r.value))/100));
+  }
+  toSavings = Math.max(0, Math.min(amount, toSavings));
+  return {savings:toSavings, wallet:amount-toSavings};
+}
+function addIncomeSplit(amount, memoBase, extra){
+  const ds = (extra && extra.date) || todayStr();
+  const {savings, wallet} = splitIncome(amount, ds);
+  if(savings>0) addTransaction("income", savings, memoBase+"（貯金箱へ）", Object.assign({bucket:"savings"}, extra));
+  if(wallet>0) addTransaction("income", wallet, memoBase+"（財布へ）", Object.assign({bucket:"wallet"}, extra));
+}
+function pushNotification(msg){
+  if(!state.notifications) state.notifications=[];
+  state.notifications.unshift({id:cid(), date:todayStr(), time:new Date().toTimeString().slice(0,5), msg, read:false});
+  state.notifications = state.notifications.slice(0,50);
+}
+function getStreak(s=state){
+  let streak=0; let d=new Date();
+  while(true){
+    const ds=todayStr(d);
+    const log=s.dailyLog[ds];
+    const hadMust = (s.chores||[]).some(c=>c.priority==="must" && isChoreDueToday(c, ds));
+    const doneMust = log && (s.chores||[]).filter(c=>c.priority==="must" && isChoreDueToday(c,ds)).every(c=>log.completed.includes(c.id));
+    if(hadMust && doneMust){ streak++; d.setDate(d.getDate()-1); }
+    else break;
+    if(streak>60) break;
+  }
+  return streak;
+}
+function spinGachaFull(prizes){
+  const valid = (prizes||[]).filter(p=> p.percent>0 && p.amount>0);
+  if(!valid.length) return null;
+  const total = valid.reduce((s,p)=>s+p.percent,0);
+  if(total<=0) return null;
+  let r = Math.random()*total;
+  let idx = valid.length-1;
+  for(let i=0;i<valid.length;i++){
+    if(r < valid[i].percent){ idx=i; break; }
+    r -= valid[i].percent;
+  }
+  return {amount: valid[idx].amount, index: idx, prizes: valid};
+}
+function computeRanks(prizes){
+  // prizesと同じ並び順で、確率が低いほどレアなランク文字列を返す（LR→UR→SSR→SR→R以降はR）
+  const rankNames = ["LR","UR","SSR","SR"];
+  const order = prizes.map((p,i)=>i).sort((a,b)=> prizes[a].percent - prizes[b].percent);
+  const rankByIndex = {};
+  order.forEach((origIdx, pos)=>{ rankByIndex[origIdx] = pos < rankNames.length ? rankNames[pos] : "R"; });
+  return prizes.map((p,i)=> rankByIndex[i]);
+}
+function queueGachaDraw(label, type){
+  if(!state.pendingGachaDraws) state.pendingGachaDraws=[];
+  state.pendingGachaDraws.push({id:cid(), label, type: type||"achievement"});
+  pushNotification(`🎁 ${label}！ガチャガチャが引けるようになったよ！`);
+}
+function checkStreakBonus(ds){
+  const dueMust = state.chores.filter(c=>c.priority==="must" && isChoreDueToday(c,ds));
+  if(!dueMust.length) return;
+  const log = getLog(ds);
+  const allDone = dueMust.every(c=>log.completed.includes(c.id));
+  if(!allDone) return;
+  const streak = getStreak(state);
+  const key = String(streak);
+  const milestones = state.streakMilestones || {};
+  if(!milestones[key]) return;
+  if(!state.streakAwardedDates) state.streakAwardedDates={};
+  if(state.streakAwardedDates[key] === ds) return;
+  state.streakAwardedDates[key] = ds;
+  const label = streak>=30 ? "1ヶ月連続達成" : `${streak}日連続達成`;
+  queueGachaDraw(label);
+}
+function checkOtherMilestones(){
+  if(!state.milestoneAwarded) state.milestoneAwarded={};
+  const bonusCount = countBonusChoreCompletions(state);
+  [5,10,30].forEach(n=>{
+    const key = "bonus_"+n;
+    if(bonusCount>=n && !state.milestoneAwarded[key]){
+      state.milestoneAwarded[key] = true;
+      queueGachaDraw(`ボーナスお手伝い${n}回達成`);
+    }
+  });
+  const savings = getBucketBalance("savings");
+  [1000,3000,5000].forEach(n=>{
+    const key = "savings_"+n;
+    if(savings>=n && !state.milestoneAwarded[key]){
+      state.milestoneAwarded[key] = true;
+      queueGachaDraw(`貯金箱${n.toLocaleString("ja-JP")}円達成`);
+    }
+  });
+}
+
+/* =========================================================================
+   RENDER: HOME
+========================================================================= */
+function renderHome(){
+  const ds = todayStr();
+  const log = getLog(ds);
+  const savings = getBucketBalance("savings");
+  const wallet = getBucketBalance("wallet");
+  document.getElementById("balanceAmount").innerHTML = savings.toLocaleString("ja-JP")+"<span>円</span>";
+  document.getElementById("homeWalletAmt").innerHTML = wallet.toLocaleString("ja-JP")+"<span>円</span>";
+  document.getElementById("familyNameShow").textContent = state.familyName;
+
+  // goal progress（貯金箱の金額を基準に計算）
+  const g = state.goal;
+  const progress = g.subgoalAmount>0 ? Math.min(100, Math.round(savings/g.subgoalAmount*100)) : 0;
+  document.getElementById("goalProgressFill").style.width = progress+"%";
+  document.getElementById("subgoalName").textContent = g.subgoalName ? `🎁 ${g.subgoalName}（${fmtYen(g.subgoalAmount)}）` : "ほしいものを設定しよう";
+  let subText = "せっていから目標をきめてね";
+  let todayTarget = 0;
+  if(g.subgoalName && g.subgoalAmount>0){
+    const remain = Math.max(0, g.subgoalAmount - savings);
+    if(remain<=0){ subText = "🎉 目標達成！おめでとう！"; }
+    else if(g.deadline){
+      const daysLeft = Math.max(1, daysBetween(todayStr(), g.deadline));
+      const perDay = Math.ceil(remain/daysLeft);
+      todayTarget = perDay;
+      subText = `あと${fmtYen(remain)}／のこり${daysLeft}日 → 1日${fmtYen(perDay)}めやす`;
+    } else {
+      subText = `あと${fmtYen(remain)}でとどく！`;
+    }
+  }
+  document.getElementById("goalSubText").textContent = subText;
+  drawJar("jarSvg", progress);
+
+  // 今日のもくひょう金額（親が手動設定していればそちらを優先）と 今日かせいだ金額（進捗）
+  if(g.dailyTargetOverride!=null && g.dailyTargetOverride>0) todayTarget = g.dailyTargetOverride;
+  const todayEarned = state.transactions.filter(t=>t.date===ds && t.type==="income").reduce((s,t)=>s+t.amount,0);
+  document.getElementById("todayGoalAmt").textContent = todayTarget>0 ? fmtYen(todayTarget) : "未設定";
+  document.getElementById("todayEarnedAmt").textContent = fmtYen(todayEarned);
+  const todayPct = todayTarget>0 ? Math.min(100, Math.round(todayEarned/todayTarget*100)) : (todayEarned>0 ? 100 : 0);
+  document.getElementById("todayProgressFill").style.width = todayPct+"%";
+  let todayCaption = "";
+  if(todayTarget>0){
+    todayCaption = todayEarned>=todayTarget ? "🎉 今日のもくひょう達成！すごい！" : `今日のもくひょうまで あと${fmtYen(Math.max(0,todayTarget-todayEarned))}`;
+  }
+  document.getElementById("todayProgressCaption").textContent = todayCaption;
+
+  document.getElementById("qualGoalText").textContent = g.qualitative || "せっていから、かぞくでめざすことを書いてみよう";
+
+  // badges（連続ボーナスバッジ＋基本バッジ）
+  const br = document.getElementById("badgeRow"); br.innerHTML="";
+  [...BADGES, ...buildStreakBadges(), ...buildBonusCountBadges(), ...buildSavingsMilestoneBadges()].forEach(b=>{
+    const on = b.test(state);
+    const el = document.createElement("div");
+    el.className = "badge"+(on?" on":"");
+    el.innerHTML = `<div class="em">${b.em}</div><div class="t">${b.t}</div>`;
+    br.appendChild(el);
+  });
+
+  // tasks
+  const due = state.chores.filter(c=>isChoreDueToday(c, ds));
+  const must = due.filter(c=>c.priority==="must");
+  let opt = due.filter(c=>c.priority!=="must");
+  const extraIds = log.extraOptional || [];
+  const extraChores = state.chores
+    .filter(c=> extraIds.includes(c.id) && !due.some(d=>d.id===c.id))
+    .map(c=> c.priority==="must" ? Object.assign({}, c, {priority:"optional"}) : c);
+  opt = [...opt, ...extraChores];
+  document.getElementById("mustCount").textContent = must.length;
+  document.getElementById("optCount").textContent = opt.length;
+  document.getElementById("mustTaskList").innerHTML = must.map(c=>taskCardHtml(c, log)).join("") || `<div class="empty-note">今日の必須タスクはないよ</div>`;
+  document.getElementById("optTaskList").innerHTML = opt.map(c=>taskCardHtml(c, log)).join("") || `<div class="empty-note">今日のボーナスタスクはないよ</div>`;
+
+  // emergency
+  const es = document.getElementById("emergencySection");
+  if(log.emergencies.length){
+    es.innerHTML = `<div class="task-group-title">🚨 きんきゅうミッション <span class="count" style="background:var(--danger); color:#fff;">${log.emergencies.length}</span></div>` +
+      log.emergencies.map(e=>emergencyCardHtml(e, log)).join("");
+  } else { es.innerHTML=""; }
+
+  const allDone = [...must,...opt].every(c=>log.completed.includes(c.id)) && log.emergencies.every(e=>e.done);
+  document.getElementById("allDoneNote").style.display = (allDone && (must.length+opt.length+log.emergencies.length>0)) ? "block":"none";
+
+  const pending = state.pendingGachaDraws || [];
+  const gachaBanner = document.getElementById("gachaPendingBanner");
+  if(state.role==="child" && pending.length>0){
+    gachaBanner.style.display = "flex";
+    document.getElementById("gachaPendingCount").textContent = pending.length;
+  } else {
+    gachaBanner.style.display = "none";
+  }
+  checkGiftAnnouncement();
+
+  updateBellBadge();
+  renderWishlistHome();
+}
+
+function taskCardHtml(c, log){
+  const done = log.completed.includes(c.id);
+  return `<div class="task-card ${done?"done":""} ${c.priority!=="must"?"optional":""}">
+    <div class="task-emoji">${c.emoji||"🧹"}</div>
+    <div class="task-info">
+      <div class="name ${done?"done-text":""}">${esc(c.name)}</div>
+      <div class="meta">${cycleLabel(c.cycle)}${c.condition? " ・ "+esc(c.condition):""}</div>
+      <div class="tagrow"><span class="tag ${c.priority==='must'?'must':'optional'}">${c.priority==='must'?'ぜったい':'ボーナス'}</span></div>
+    </div>
+    <div class="task-amount">+${c.amount}円</div>
+    <button class="check-btn ${done?"checked":""}" onclick="toggleChore('${c.id}', event)">${done?"✓":""}</button>
+  </div>`;
+}
+function emergencyCardHtml(e, log){
+  const done = !!e.done;
+  return `<div class="task-card emergency ${done?"done":""}">
+    <div class="task-emoji">${e.emoji||"🚨"}</div>
+    <div class="task-info">
+      <div class="name ${done?"done-text":""}">${esc(e.name)}</div>
+      <div class="meta">おうちの人から のお願い</div>
+      <div class="tagrow"><span class="tag emergency">きんきゅう</span></div>
+    </div>
+    <div class="task-amount">+${e.amount}円</div>
+    <button class="check-btn ${done?"checked":""}" onclick="toggleEmergency('${e.id}', event)">${done?"✓":""}</button>
+  </div>`;
+}
+
+function toggleChore(choreId, ev){
+  const ds = todayStr();
+  const log = getLog(ds);
+  const chore = state.chores.find(c=>c.id===choreId);
+  const idx = log.completed.indexOf(choreId);
+  if(idx>=0){
+    log.completed.splice(idx,1);
+    removeTransactionFor("chore",choreId,ds);
+    saveState(); renderHome();
+    return;
+  }
+  if(state.role==="child"){
+    openConfirmDoneModal(chore.name, ()=> completeChore(chore, ds, ev));
+  } else {
+    completeChore(chore, ds, ev);
+  }
+}
+function completeChore(chore, ds, ev){
+  const log = getLog(ds);
+  log.completed.push(chore.id);
+  chore.lastDone = ds;
+  addIncomeSplit(chore.amount, chore.name, {source:"chore", refId:chore.id, date:ds});
+  pushNotification(`「${chore.name}」を完了したよ！（+${chore.amount}円）`);
+  checkStreakBonus(ds);
+  checkOtherMilestones();
+  saveState(); coinBurst(ev);
+  toast(`+${chore.amount}円！やったね✨`);
+  renderHome();
+}
+function toggleEmergency(eid, ev){
+  const ds = todayStr();
+  const log = getLog(ds);
+  const e = log.emergencies.find(x=>x.id===eid);
+  if(!e) return;
+  if(e.done){
+    e.done=false; removeTransactionFor("emergency",eid,ds);
+    saveState(); renderHome();
+    return;
+  }
+  if(state.role==="child"){
+    openConfirmDoneModal(e.name, ()=> completeEmergency(e, ds, ev));
+  } else {
+    completeEmergency(e, ds, ev);
+  }
+}
+function completeEmergency(e, ds, ev){
+  e.done=true;
+  addIncomeSplit(e.amount, `${e.name}（緊急ミッション）`, {source:"emergency", refId:e.id, date:ds});
+  pushNotification(`🚨きんきゅうミッション「${e.name}」を完了したよ！（+${e.amount}円）`);
+  checkOtherMilestones();
+  saveState(); coinBurst(ev); toast(`きんきゅうミッション達成！+${e.amount}円`); renderHome();
+}
+function openConfirmDoneModal(name, onYes){
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>さいごの確認</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px 10px;">
+      <p style="font-size:16px; font-weight:700; text-align:center; margin:6px 0 20px; line-height:1.6;">「${esc(name)}」を<br>ちゃんと やりきった？</p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-outline btn-block" onclick="closeModal()">まだ・やめる</button>
+        <button class="btn btn-primary btn-block" id="confirmYesBtn">はい！やった！</button>
+      </div>
+    </div>`;
+  openModal(html);
+  document.getElementById("confirmYesBtn").onclick = ()=>{ closeModal(); onYes(); };
+}
+function openNotifications(){
+  const list = state.notifications||[];
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🔔 お知らせ</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      ${list.length ? list.map(n=>`
+        <div class="ledger-row"><div class="ic" style="background:var(--mint-light); color:var(--mint);">✅</div>
+          <div style="flex:1;"><div class="memo">${esc(n.msg)}</div><div class="date">${n.date} ${n.time}</div></div>
+        </div>`).join("") : `<div class="empty-note">まだお知らせはありません</div>`}
+    </div>`;
+  openModal(html);
+  list.forEach(n=>n.read=true);
+  saveState(); updateBellBadge();
+}
+function updateBellBadge(){
+  const badge = document.getElementById("bellBadge");
+  if(!badge) return;
+  const unread = (state.notifications||[]).filter(n=>!n.read).length;
+  if(unread>0){ badge.style.display="flex"; badge.textContent = unread>9 ? "9+" : unread; }
+  else badge.style.display="none";
+}
+function addTransaction(type, amount, memo, extra={}){
+  state.transactions.push(Object.assign({id:cid(), date:todayStr(), type, amount, memo}, extra));
+}
+function removeTransactionFor(source, refId, date){
+  state.transactions = state.transactions.filter(t=>!(t.source===source && t.refId===refId && t.date===date));
+}
+
+/* ---------------- Coin burst / toast ---------------- */
+function coinBurst(ev){
+  if(!ev) return;
+  const x = ev.clientX || (ev.target.getBoundingClientRect().left+15);
+  const y = ev.clientY || (ev.target.getBoundingClientRect().top+15);
+  for(let i=0;i<5;i++){
+    const el=document.createElement("div");
+    el.className="coin-burst"; el.textContent="🪙";
+    el.style.left=(x+ (Math.random()*40-20))+"px";
+    el.style.top=(y-10)+"px";
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 900);
+  }
+}
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"), 1800);
+}
+function esc(s){ return (s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+
+/* ---------------- SVG jar drawing ---------------- */
+function drawJar(elId, pct){
+  const svg = document.getElementById(elId);
+  const w = svg.getAttribute("width"), h = svg.getAttribute("height");
+  const fillH = Math.max(4, (h-10) * (pct/100));
+  svg.innerHTML = `
+    <rect x="4" y="6" width="${w-8}" height="${h-10}" rx="10" fill="rgba(255,255,255,.25)" stroke="rgba(255,255,255,.7)" stroke-width="2"/>
+    <rect x="6" y="${h-6-fillH}" width="${w-12}" height="${fillH}" rx="8" fill="#FFC93C"/>
+    <rect x="${w/2-8}" y="0" width="16" height="8" rx="3" fill="rgba(255,255,255,.8)"/>
+    <text x="${w/2}" y="${h-6}" font-size="10" text-anchor="middle" fill="#5A4200" font-weight="bold" dy="-2">${pct}%</text>
+  `;
+}
+
+/* =========================================================================
+   RENDER: CHORES MANAGEMENT
+========================================================================= */
+function renderChores(){
+  const isParent = state.role==="parent";
+  document.getElementById("btnAddChore").style.display = isParent ? "block" : "none";
+  const wrap = document.getElementById("choreListWrap");
+  wrap.innerHTML = state.chores.map(c=>`
+    <div class="chore-row">
+      <div style="font-size:22px;">${c.emoji||"🧹"}</div>
+      <div style="flex:1;">
+        <div class="name">${esc(c.name)} <span class="tag ${c.priority==='must'?'must':'optional'}" style="margin-left:4px;">${c.priority==='must'?'ぜったい':'ボーナス'}</span></div>
+        <div class="meta">${cycleLabel(c.cycle)}${c.condition?" ・ "+esc(c.condition):""}</div>
+      </div>
+      <div class="amt">${c.amount}円</div>
+      ${isParent ? `<button class="icon-btn" onclick="confirmEditChore('${c.id}')">✏️</button><button class="icon-btn" onclick="deleteChore('${c.id}')">🗑️</button>` : ``}
+    </div>
+  `).join("") || `<div class="empty-note">まだお手伝いがありません。${isParent? "「＋新しいお手伝いを追加」から作ってみよう。":"おうちの人に追加してもらってね。"}</div>`;
+}
+function deleteChore(id){
+  if(state.role!=="parent"){ toast("保護者モードでのみ削除できます"); return; }
+  const c = state.chores.find(x=>x.id===id);
+  openConfirmModal(`「${c?c.name:"このお手伝い"}」を削除しますか？`, ()=>{
+    state.chores = state.chores.filter(x=>x.id!==id);
+    saveState(); renderChores();
+    toast("削除したよ");
+  }, "削除する", true);
+}
+
+function openChoreForm(existingId){
+  if(state.role!=="parent"){ toast("保護者モードでのみ編集できます"); return; }
+  const existing = existingId ? state.chores.find(c=>c.id===existingId) : null;
+  const cycle = existing? existing.cycle : {type:"daily"};
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>${existing?"お手伝いを編集":"新しいお手伝い"}</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">お手伝いの名前</label>
+      <input type="text" id="cf_name" value="${existing?esc(existing.name):""}" placeholder="例：お風呂そうじ">
+      <label class="f">アイコン</label>
+      <div class="chip-row" id="cf_emoji_row">
+        ${CHORE_EMOJI.map(em=>`<div class="chip ${existing&&existing.emoji===em?'sel':''}" data-em="${em}" onclick="pickEmoji(this,'${em}')">${em}</div>`).join("")}
+      </div>
+      <label class="f">金額（円）</label>
+      <input type="number" id="cf_amount" value="${existing?existing.amount:20}">
+      <label class="f">重要度</label>
+      <div class="pill-select" id="cf_priority">
+        <button type="button" class="${(!existing||existing.priority==='must')?'active':''}" data-v="must" onclick="pickPriority(this,'must')">ぜったいやる</button>
+        <button type="button" class="${(existing&&existing.priority==='optional')?'active':''}" data-v="optional" onclick="pickPriority(this,'optional')">やってもいい</button>
+      </div>
+      <label class="f">周期</label>
+      <div class="pill-select" id="cf_cycletype">
+        <button type="button" data-v="daily" class="${cycle.type==='daily'?'active':''}" onclick="pickCycleType(this,'daily')">毎日</button>
+        <button type="button" data-v="everyNDays" class="${cycle.type==='everyNDays'?'active':''}" onclick="pickCycleType(this,'everyNDays')">〇日おき</button>
+        <button type="button" data-v="weekly" class="${cycle.type==='weekly'?'active':''}" onclick="pickCycleType(this,'weekly')">曜日で指定</button>
+      </div>
+      <div id="cf_ndays_wrap" style="display:${cycle.type==='everyNDays'?'block':'none'}; margin-top:10px;">
+        <label class="f">何日おき？</label>
+        <input type="number" id="cf_ndays" value="${cycle.n||2}" min="1">
+      </div>
+      <div id="cf_weekly_wrap" style="display:${cycle.type==='weekly'?'block':'none'}; margin-top:10px;">
+        <label class="f">曜日をえらぶ</label>
+        <div class="weekday-grid" id="cf_weekday_grid">
+          ${WEEKDAYS.map((w,i)=>`<div class="chip ${cycle.days&&cycle.days.includes(i)?'sel':''}" data-d="${i}" onclick="toggleWeekday(this,${i})">${w}</div>`).join("")}
+        </div>
+      </div>
+      <label class="f">条件・メモ（任意）</label>
+      <input type="text" id="cf_condition" value="${existing?esc(existing.condition||""):""}" placeholder="例：夜ごはんの前に">
+      <button class="btn btn-primary btn-block" style="margin-top:18px;" onclick="saveChoreForm('${existingId||""}')">保存する</button>
+    </div>
+  `;
+  openModal(html);
+  window._cf_emoji = existing? existing.emoji : CHORE_EMOJI[0];
+  window._cf_priority = existing? existing.priority : "must";
+  window._cf_cycletype = cycle.type;
+  window._cf_weekdays = cycle.days? [...cycle.days] : [1,3,5];
+}
+function pickEmoji(el, em){ document.querySelectorAll("#cf_emoji_row .chip").forEach(c=>c.classList.remove("sel")); el.classList.add("sel"); window._cf_emoji=em; }
+function pickPriority(el, v){ document.querySelectorAll("#cf_priority button").forEach(c=>c.classList.remove("active")); el.classList.add("active"); window._cf_priority=v; }
+function pickCycleType(el, v){
+  document.querySelectorAll("#cf_cycletype button").forEach(c=>c.classList.remove("active")); el.classList.add("active");
+  window._cf_cycletype=v;
+  document.getElementById("cf_ndays_wrap").style.display = v==="everyNDays"?"block":"none";
+  document.getElementById("cf_weekly_wrap").style.display = v==="weekly"?"block":"none";
+}
+function toggleWeekday(el,i){
+  el.classList.toggle("sel");
+  const set = new Set(window._cf_weekdays);
+  if(set.has(i)) set.delete(i); else set.add(i);
+  window._cf_weekdays = [...set];
+}
+function saveChoreForm(existingId){
+  const name = document.getElementById("cf_name").value.trim();
+  if(!name){ toast("名前を入れてね"); return; }
+  const amount = parseInt(document.getElementById("cf_amount").value)||0;
+  const condition = document.getElementById("cf_condition").value.trim();
+  let cycle;
+  if(window._cf_cycletype==="everyNDays") cycle = {type:"everyNDays", n: parseInt(document.getElementById("cf_ndays").value)||1};
+  else if(window._cf_cycletype==="weekly") cycle = {type:"weekly", days: window._cf_weekdays};
+  else cycle = {type:"daily"};
+
+  if(existingId){
+    const c = state.chores.find(x=>x.id===existingId);
+    Object.assign(c, {name, amount, condition, cycle, priority:window._cf_priority, emoji:window._cf_emoji});
+  } else {
+    state.chores.push({id:cid(), name, amount, condition, cycle, priority:window._cf_priority, emoji:window._cf_emoji, lastDone:null});
+  }
+  saveState(); closeModal(); renderChores(); renderHome();
+  toast("保存したよ！");
+}
+
+/* =========================================================================
+   RENDER: LEDGER
+========================================================================= */
+function renderLedger(){
+  const savings = getBucketBalance("savings");
+  const wallet = getBucketBalance("wallet");
+  document.getElementById("walletAmount").innerHTML = wallet.toLocaleString("ja-JP")+"<span>円</span>";
+  document.getElementById("savingsAmount").innerHTML = savings.toLocaleString("ja-JP")+"<span>円</span>";
+  const g = state.goal;
+  const progress = g.subgoalAmount>0 ? Math.min(100, Math.round(savings/g.subgoalAmount*100)) : 0;
+  drawJar("savingsJar", progress);
+
+  document.getElementById("ledgerGoalFill").style.width = progress+"%";
+  document.getElementById("ledgerGoalName").textContent = g.subgoalName ? `🎁 ${g.subgoalName}（${fmtYen(g.subgoalAmount)}）` : "ほしいものを設定しよう";
+  let ledgerGoalSub = "せっていから目標をきめてね";
+  if(g.subgoalName && g.subgoalAmount>0){
+    const remain = Math.max(0, g.subgoalAmount - savings);
+    ledgerGoalSub = remain<=0 ? "🎉 目標達成！おめでとう！" : `あと${fmtYen(remain)}でとどく！`;
+  }
+  document.getElementById("ledgerGoalSub").textContent = ledgerGoalSub;
+
+  const mk = currentMonthKey();
+  const monthTx = state.transactions.filter(t=>t.date.startsWith(mk));
+  const income = monthTx.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+  const expense = monthTx.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+  document.getElementById("monthIncome").textContent = fmtYen(income);
+  document.getElementById("monthExpense").textContent = fmtYen(expense);
+
+  const sorted = [...state.transactions].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const isParent = state.role==="parent";
+  const incomeTx = sorted.filter(t=>t.type==="income").slice(0,60);
+  const expenseTx = sorted.filter(t=>t.type==="expense").slice(0,60);
+  document.getElementById("incomeList").innerHTML = incomeTx.map(t=>ledgerRowHtml(t, isParent)).join("") || `<div class="empty-note">まだ記録がありません</div>`;
+  document.getElementById("expenseList").innerHTML = expenseTx.map(t=>ledgerRowHtml(t, isParent)).join("") || `<div class="empty-note">まだ記録がありません</div>`;
+}
+function ledgerRowHtml(t, isParent){
+  return `<div class="ledger-row ${t.type}">
+      <div class="ic">${t.type==="income"?"➕":"➖"}</div>
+      <div style="flex:1;">
+        <div class="memo">${esc(t.memo)}${t.type==="income"?` <span class="tag ${t.bucket==="savings"?"must":"optional"}" style="margin-left:4px;">${t.bucket==="savings"?"貯金箱":"財布"}</span>`:""}</div>
+        <div class="date">${t.date}</div>
+      </div>
+      <div class="amt">${t.type==="income"?"+":"-"}${t.amount}円</div>
+      ${isParent ? `<div class="row-actions"><button class="icon-btn" onclick="confirmEditTx('${t.id}')">✏️</button><button class="icon-btn" onclick="deleteTx('${t.id}')">🗑️</button></div>` : ``}
+    </div>`;
+}
+function toggleLedgerGroup(key){
+  document.getElementById(key+"List").classList.toggle("collapsed");
+  document.getElementById(key+"Chev").classList.toggle("collapsed");
+}
+function openEditTxForm(txId){
+  if(state.role!=="parent"){ toast("保護者モードでのみ編集できます"); return; }
+  const t = state.transactions.find(x=>x.id===txId);
+  if(!t) return;
+  window._txBucket = t.bucket||"wallet";
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>記録を編集</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">内容</label>
+      <input type="text" id="tx_memo" value="${esc(t.memo)}">
+      <label class="f">金額（円）</label>
+      <input type="number" id="tx_amount" value="${t.amount}">
+      ${t.type==="income" ? `
+      <label class="f">振り分け先</label>
+      <div class="pill-select" id="tx_bucket">
+        <button type="button" data-v="savings" class="${t.bucket==="savings"?"active":""}" onclick="pickTxBucket(this,'savings')">貯金箱</button>
+        <button type="button" data-v="wallet" class="${t.bucket!=="savings"?"active":""}" onclick="pickTxBucket(this,'wallet')">財布</button>
+      </div>` : ``}
+      <div style="display:flex; gap:10px; margin-top:18px;">
+        <button class="btn btn-danger btn-block" onclick="deleteTx('${txId}')">削除する</button>
+        <button class="btn btn-primary btn-block" onclick="saveTxEdit('${txId}')">保存する</button>
+      </div>
+    </div>`;
+  openModal(html);
+}
+function pickTxBucket(el, v){
+  document.querySelectorAll("#tx_bucket button").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+  window._txBucket = v;
+}
+function saveTxEdit(txId){
+  if(state.role!=="parent"){ toast("保護者モードでのみ編集できます"); return; }
+  const t = state.transactions.find(x=>x.id===txId);
+  if(!t) return;
+  const memo = document.getElementById("tx_memo").value.trim();
+  if(memo) t.memo = memo;
+  t.amount = parseInt(document.getElementById("tx_amount").value)||0;
+  if(t.type==="income") t.bucket = window._txBucket;
+  saveState(); closeModal(); renderLedger(); renderHome();
+  toast("保存したよ");
+}
+function deleteTx(txId){
+  if(state.role!=="parent"){ toast("保護者モードでのみ削除できます"); return; }
+  openConfirmModal("この記録を削除しますか？", ()=>{
+    state.transactions = state.transactions.filter(x=>x.id!==txId);
+    saveState(); closeModal(); renderLedger(); renderHome();
+    toast("削除したよ");
+  }, "削除する", true);
+}
+function wishlistRowHtml(w){
+  return `<div class="chore-row" style="${w.done?"opacity:.5;":""}">
+    <div style="font-size:20px;">🎁</div>
+    <div style="flex:1;">
+      <div class="name">${esc(w.name)}${w.done?` <span class="tag must" style="margin-left:4px;">かった！</span>`:""}</div>
+      <div class="meta">${fmtYen(w.amount)}${w.deadline?` ・ ${w.deadline}まで`:""}</div>
+    </div>
+    ${!w.done ? `
+      <button class="icon-btn" title="これを目標にする" onclick="setGoalFromWishlist('${w.id}')">🎯</button>
+      <button class="icon-btn" title="かった・やった" onclick="markWishlistDone('${w.id}')">✅</button>
+    ` : ``}
+    <button class="icon-btn" onclick="deleteWishlistItem('${w.id}')">🗑️</button>
+  </div>`;
+}
+function renderWishlistHome(){
+  const wrap = document.getElementById("wishlistList");
+  if(!wrap) return;
+  const list = state.wishlist || [];
+  wrap.innerHTML = list.length ? list.map(wishlistRowHtml).join("") : `<div class="empty-note">まだ登録されていません。「＋ほしいものを追加」から書いてみよう</div>`;
+}
+function toggleWishlistGroup(){
+  document.getElementById("wishlistBody").classList.toggle("collapsed");
+  document.getElementById("wishlistChev").classList.toggle("collapsed");
+}
+function openAddWishlistForm(){
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🎁 ほしいものを追加</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">名前</label>
+      <input type="text" id="wl_name" placeholder="例：あたらしいゲーム">
+      <label class="f">金額（円）</label>
+      <input type="number" id="wl_amount" placeholder="例：3000">
+      <label class="f">いつまでに？（任意）</label>
+      <input type="date" id="wl_deadline">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="saveWishlistItem()">追加する</button>
+    </div>`;
+  openModal(html);
+}
+function saveWishlistItem(){
+  const name = document.getElementById("wl_name").value.trim();
+  if(!name){ toast("名前を入れてね"); return; }
+  const amount = parseInt(document.getElementById("wl_amount").value)||0;
+  const deadline = document.getElementById("wl_deadline").value;
+  if(!state.wishlist) state.wishlist=[];
+  state.wishlist.push({id:cid(), name, amount, deadline, done:false, doneDate:null});
+  saveState(); closeModal(); renderWishlistHome();
+  toast("追加したよ！");
+}
+function setGoalFromWishlist(id){
+  const w = (state.wishlist||[]).find(x=>x.id===id);
+  if(!w) return;
+  state.goal.subgoalName = w.name;
+  state.goal.subgoalAmount = w.amount;
+  if(w.deadline) state.goal.deadline = w.deadline;
+  saveState(); renderHome(); renderWishlistHome();
+  toast(`「${w.name}」を目標にしたよ！`);
+}
+function markWishlistDone(id){
+  const w = (state.wishlist||[]).find(x=>x.id===id);
+  if(!w) return;
+  openConfirmModal(`「${w.name}」を かった・やった にしますか？`, ()=>{
+    w.done = true; w.doneDate = todayStr();
+    saveState(); renderWishlistHome();
+    toast("やったね！おめでとう🎉");
+  }, "かった！", false);
+}
+function deleteWishlistItem(id){
+  openConfirmModal("このほしいものを削除しますか？", ()=>{
+    state.wishlist = (state.wishlist||[]).filter(x=>x.id!==id);
+    saveState(); renderWishlistHome();
+    toast("削除したよ");
+  }, "削除する", true);
+}
+function openAddBonusChoreModal(){
+  const ds = todayStr();
+  const log = getLog(ds);
+  const dueIds = new Set(state.chores.filter(c=>isChoreDueToday(c,ds)).map(c=>c.id));
+  const extraIds = new Set(log.extraOptional||[]);
+  const available = state.chores.filter(c=> !dueIds.has(c.id) && !extraIds.has(c.id));
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>✨ ほかのお手伝いもやる？</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">やりたいお手伝いをえらぶと、今日の「やってもいい」に追加されるよ。</p>
+      ${available.length ? available.map(c=>`
+        <div class="chore-row" style="cursor:pointer;" onclick="addBonusChoreToday('${c.id}')">
+          <div style="font-size:22px;">${c.emoji||"🧹"}</div>
+          <div style="flex:1;"><div class="name">${esc(c.name)}</div><div class="meta">${cycleLabel(c.cycle)}</div></div>
+          <div class="amt">${c.amount}円</div>
+        </div>`).join("") : `<div class="empty-note">追加できるお手伝いはもうないよ。すごい！</div>`}
+    </div>`;
+  openModal(html);
+}
+function addBonusChoreToday(choreId){
+  const ds = todayStr();
+  const log = getLog(ds);
+  if(!log.extraOptional) log.extraOptional=[];
+  if(!log.extraOptional.includes(choreId)) log.extraOptional.push(choreId);
+  saveState(); closeModal(); renderHome();
+  toast("今日のボーナスに追加したよ！");
+}
+
+function openExpenseForm(){
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>💸 つかったお金を記録</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <div class="softred-banner">なにに いくら つかったか、きろくしてみよう</div>
+      <label class="f">なにに つかった？</label>
+      <input type="text" id="ex_memo" placeholder="例：おかし、ガチャガチャ">
+      <label class="f">金額（円）</label>
+      <input type="number" id="ex_amount" placeholder="例：100">
+      <button class="btn btn-softred btn-block" style="margin-top:18px;" onclick="saveExpense()">記録する</button>
+    </div>`;
+  openModal(html);
+}
+function saveExpense(){
+  const memo = document.getElementById("ex_memo").value.trim() || "おかいもの";
+  const amount = parseInt(document.getElementById("ex_amount").value)||0;
+  if(amount<=0){ toast("金額を入れてね"); return; }
+  addTransaction("expense", amount, memo, {bucket:"wallet"});
+  saveState(); closeModal(); renderLedger(); renderHome();
+  toast("記録したよ");
+}
+
+/* =========================================================================
+   RENDER: SETTINGS
+========================================================================= */
+function renderSettings(){
+  document.getElementById("qualGoalInput").value = state.goal.qualitative||"";
+  document.getElementById("subgoalNameInput").value = state.goal.subgoalName||"";
+  document.getElementById("subgoalAmountInput").value = state.goal.subgoalAmount||"";
+  document.getElementById("subgoalDeadlineInput").value = state.goal.deadline||"";
+  document.getElementById("dailyTargetInput").value = state.goal.dailyTargetOverride!=null ? state.goal.dailyTargetOverride : "";
+  if(fbEnabled){
+    document.getElementById("pwCardDesc").textContent = "これは、かぞく共通のログインパスワード（Firebase）です。こども視点から戻るとき・月末ふりかえりを終えるときにも使います。";
+    document.getElementById("btnFbSignOut").style.display = "block";
+  }
+  updateDailyNeedPreview();
+
+  const rwGrid = document.getElementById("reflectionWeekdayGrid");
+  if(!rwGrid.dataset.filled){
+    rwGrid.innerHTML = WEEKDAYS.map((w,i)=>`<div class="chip" data-d="${i}" onclick="pickReflectionWeekday(this,${i})">${w}</div>`).join("");
+    rwGrid.dataset.filled="1";
+  }
+  window._reflectionWeekday = state.reflectionWeekday;
+  document.querySelectorAll("#reflectionWeekdayGrid .chip").forEach(c=> c.classList.toggle("sel", parseInt(c.dataset.d)===state.reflectionWeekday));
+
+  window._srType = state.savingsRule.type;
+  document.querySelectorAll("#srType button").forEach(b=> b.classList.toggle("active", b.dataset.v===state.savingsRule.type));
+  document.getElementById("srValueLabel").textContent = state.savingsRule.type==="percent" ? "貯金箱に入れる割合（％）" : "1日に貯金箱へ入れる目標額（円）";
+  document.getElementById("srValueInput").value = state.savingsRule.value;
+
+  window._streakMilestones = Object.assign({}, state.streakMilestones);
+  document.querySelectorAll("#streakMilestoneRow .chip").forEach(c=>{
+    c.classList.toggle("sel", !!window._streakMilestones[c.dataset.m]);
+  });
+  window._gachaPrizes = JSON.parse(JSON.stringify((state.streakGacha && state.streakGacha.prizes) || []));
+  renderGachaPrizeList();
+
+  document.getElementById("setWalletInput").value = getBucketBalance("wallet");
+  document.getElementById("setSavingsInput").value = getBucketBalance("savings");
+}
+function setBalances(){
+  const newWallet = parseInt(document.getElementById("setWalletInput").value)||0;
+  const newSavings = parseInt(document.getElementById("setSavingsInput").value)||0;
+  const curWallet = getBucketBalance("wallet");
+  const curSavings = getBucketBalance("savings");
+  const wDiff = newWallet - curWallet;
+  const sDiff = newSavings - curSavings;
+  const ds = todayStr();
+  if(wDiff!==0) addTransaction(wDiff>0?"income":"expense", Math.abs(wDiff), "残高調整（保護者設定）", {bucket:"wallet", date:ds});
+  if(sDiff!==0) addTransaction(sDiff>0?"income":"expense", Math.abs(sDiff), "残高調整（保護者設定）", {bucket:"savings", date:ds});
+  saveState(); renderHome(); toast("金額を設定したよ");
+}
+function toggleMilestone(el, key){
+  window._streakMilestones[key] = !window._streakMilestones[key];
+  el.classList.toggle("sel", !!window._streakMilestones[key]);
+}
+function gachaPrizeRowHtml(p, idx, rank){
+  return `<div class="gacha-prize-row">
+      <span class="grade-tag rank-${rank}" style="flex-shrink:0;">${rank}</span>
+      <input type="number" class="gacha-amt" data-idx="${idx}" value="${p.amount}" placeholder="金額">
+      <span style="font-size:12px; color:var(--plum-soft);">円 /</span>
+      <input type="number" class="gacha-pct" data-idx="${idx}" value="${p.percent}" placeholder="%" style="max-width:70px;">
+      <span style="font-size:12px; color:var(--plum-soft);">%</span>
+      <button class="icon-btn" onclick="removeGachaPrize(${idx})">🗑️</button>
+    </div>`;
+}
+function renderGachaPrizeList(){
+  const wrap = document.getElementById("gachaPrizeList");
+  const ranks = computeRanks(window._gachaPrizes);
+  wrap.innerHTML = window._gachaPrizes.map((p,idx)=>gachaPrizeRowHtml(p, idx, ranks[idx])).join("") || `<div class="empty-note">景品がありません。「＋景品をふやす」から追加してね</div>`;
+  wrap.querySelectorAll(".gacha-amt").forEach(inp=>{
+    inp.oninput = e=>{ window._gachaPrizes[e.target.dataset.idx].amount = parseInt(e.target.value)||0; };
+    inp.onblur = renderGachaPrizeList;
+  });
+  wrap.querySelectorAll(".gacha-pct").forEach(inp=>{
+    inp.oninput = e=>{ window._gachaPrizes[e.target.dataset.idx].percent = parseFloat(e.target.value)||0; updateGachaPercentTotal(); };
+    inp.onblur = renderGachaPrizeList;
+  });
+  updateGachaPercentTotal();
+}
+function updateGachaPercentTotal(){
+  const total = window._gachaPrizes.reduce((s,p)=>s+(p.percent||0),0);
+  document.getElementById("gachaPercentTotal").textContent = `合計：${Math.round(total*10)/10}%（保存すると自動で100%になるよう調整されます）`;
+}
+function addGachaPrize(){
+  window._gachaPrizes.push({amount:10, percent:0});
+  renderGachaPrizeList();
+}
+function removeGachaPrize(idx){
+  window._gachaPrizes.splice(idx,1);
+  renderGachaPrizeList();
+}
+function saveGacha(){
+  const total = window._gachaPrizes.reduce((s,p)=>s+(p.percent||0),0);
+  const normalized = total>0
+    ? window._gachaPrizes.map(p=>({amount:p.amount, percent: Math.round((p.percent/total)*1000)/10}))
+    : window._gachaPrizes.map(p=>({amount:p.amount, percent:0}));
+  state.streakGacha = {prizes: normalized};
+  state.streakMilestones = Object.assign({}, window._streakMilestones);
+  saveState(); renderSettings(); renderHome();
+  toast("保存したよ");
+}
+function testGachaSpin(){
+  const prizes = window._gachaPrizes.filter(p=>p.percent>0 && p.amount>0);
+  if(!prizes.length){ toast("景品と確率を設定してから試してね"); return; }
+  openGachaponModal(prizes, "試し引き", ()=>{
+    const result = spinGachaFull(prizes);
+    const ranks = computeRanks(result.prizes);
+    return {amount: result.amount, rank: ranks[result.index]};
+  }, {real:false});
+}
+function updateDailyNeedPreview(){
+  const amount = parseInt(document.getElementById("subgoalAmountInput").value)||0;
+  const deadline = document.getElementById("subgoalDeadlineInput").value;
+  const bal = getBucketBalance("savings");
+  const box = document.getElementById("dailyNeedPreview");
+  if(amount>0 && deadline){
+    const daysLeft = Math.max(1, daysBetween(todayStr(), deadline));
+    const remain = Math.max(0, amount-bal);
+    box.textContent = `💡 のこり${daysLeft}日／必要な残り金額 ${fmtYen(remain)} → 1日あたり約 ${fmtYen(Math.ceil(remain/daysLeft))} が目安！`;
+  } else box.textContent = "";
+}
+function saveGoal(){
+  state.goal.qualitative = document.getElementById("qualGoalInput").value.trim();
+  state.goal.subgoalName = document.getElementById("subgoalNameInput").value.trim();
+  state.goal.subgoalAmount = parseInt(document.getElementById("subgoalAmountInput").value)||0;
+  state.goal.deadline = document.getElementById("subgoalDeadlineInput").value;
+  const dtVal = document.getElementById("dailyTargetInput").value;
+  state.goal.dailyTargetOverride = dtVal!=="" ? (parseInt(dtVal)||0) : null;
+  saveState(); renderHome(); toast("目標を保存したよ！");
+}
+function saveReflectionDay(){
+  state.reflectionWeekday = window._reflectionWeekday!=null ? window._reflectionWeekday : state.reflectionWeekday;
+  saveState(); toast("保存したよ");
+}
+function pickReflectionWeekday(el, i){
+  document.querySelectorAll("#reflectionWeekdayGrid .chip").forEach(c=>c.classList.remove("sel"));
+  el.classList.add("sel");
+  window._reflectionWeekday = i;
+}
+function pickSavingsType(el, v){
+  document.querySelectorAll("#srType button").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+  window._srType = v;
+  document.getElementById("srValueLabel").textContent = v==="percent" ? "貯金箱に入れる割合（％）" : "1日に貯金箱へ入れる目標額（円）";
+}
+function saveSavingsRule(){
+  const v = parseInt(document.getElementById("srValueInput").value)||0;
+  state.savingsRule = {type: window._srType||"percent", value: v};
+  saveState(); toast("保存したよ");
+}
+function changeParentPassword(){
+  const p1 = document.getElementById("newPwSetting1").value;
+  const p2 = document.getElementById("newPwSetting2").value;
+  if(p1.length<4){ toast("4文字以上にしてね"); return; }
+  if(p1!==p2){ toast("パスワードが一致しません"); return; }
+  if(fbEnabled && auth.currentUser){
+    if(p1.length<6){ toast("Firebaseのパスワードは6文字以上にしてね"); return; }
+    auth.currentUser.updatePassword(p1).then(()=>{
+      document.getElementById("newPwSetting1").value="";
+      document.getElementById("newPwSetting2").value="";
+      toast("かぞく共通のパスワードを変更したよ");
+    }).catch(e=>{
+      toast("変更できませんでした。もう一度ログインしなおしてから試してね");
+      console.warn(e);
+    });
+    return;
+  }
+  state.parentPassword = p1; saveState();
+  document.getElementById("newPwSetting1").value="";
+  document.getElementById("newPwSetting2").value="";
+  toast("パスワードを変更したよ");
+}
+function exportData(){
+  const s = JSON.stringify(state, null, 2);
+  navigator.clipboard?.writeText(s).then(()=>toast("データをコピーしました")).catch(()=>{
+    prompt("以下をコピーして保存してください：", s);
+  });
+}
+function resetData(){
+  openConfirmModal("本当にすべてのデータを削除しますか？この操作は取り消せません。", ()=>{
+    state = defaultState();
+    saveState(); renderAll();
+    toast("リセットしました");
+  }, "全部削除する", true);
+}
+
+/* =========================================================================
+   PARENT: emergency task assignment
+========================================================================= */
+function checkGiftAnnouncement(){
+  if(state.role!=="child") return;
+  if(!state.giftAnnounced) state.giftAnnounced=[];
+  const unannounced = (state.pendingGachaDraws||[]).filter(d=> d.type==="gift" && !state.giftAnnounced.includes(d.id));
+  if(!unannounced.length) return;
+  unannounced.forEach(d=> state.giftAnnounced.push(d.id));
+  saveState();
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🎟️ ガチャ券が届いてるよ！</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:6px 20px 24px; text-align:center;">
+      <div style="font-size:54px;">🎁</div>
+      <p style="font-size:15px; font-weight:700; margin:10px 0 4px;">おうちの人から ガチャ券が ${unannounced.length}枚 とどいたよ！</p>
+      <p style="font-size:12.5px; color:var(--plum-soft);">今すぐ引いてもいいし、あとで引いてもOK！</p>
+      <button class="btn btn-gold btn-block" style="margin-top:14px;" onclick="closeModal(); drawGachaNow();">🎰 さっそくガチャへ行く</button>
+      <button class="btn btn-outline btn-block" style="margin-top:10px;" onclick="closeModal()">あとで見る</button>
+    </div>`;
+  openModal(html);
+}
+function openGiftGachaModal(){
+  if(state.role!=="parent"){ toast("保護者モードでのみ利用できます"); return; }
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🎟️ ガチャ券をあげる</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">プレゼントとしてガチャガチャを引ける権利をあげます。当たった金額はそのまま貯金箱に追加されます。</p>
+      <label class="f">何枚あげる？</label>
+      <input type="number" id="gift_count" value="1" min="1">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="sendGachaGift()">送る</button>
+    </div>`;
+  openModal(html);
+}
+function sendGachaGift(){
+  const n = Math.max(1, parseInt(document.getElementById("gift_count").value)||1);
+  for(let i=0;i<n;i++){
+    queueGachaDraw("プレゼントのガチャ券", "gift");
+  }
+  saveState(); closeModal(); renderHome();
+  toast(`ガチャ券を${n}枚送ったよ！`);
+}
+function openEmergencyPicker(){
+  if(state.role!=="parent"){ toast("保護者モードでのみ利用できます"); return; }
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🚨 緊急ミッションを追加</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">お手伝いリストからえらぶ</label>
+      <select id="em_choreSelect">
+        ${state.chores.map(c=>`<option value="${c.id}">${c.emoji} ${esc(c.name)}（${c.amount}円）</option>`).join("")}
+        <option value="__custom__">＋ リストにない内容を入力する</option>
+      </select>
+      <div id="em_customWrap" style="display:none; margin-top:10px;">
+        <label class="f">内容</label>
+        <input type="text" id="em_customName" placeholder="例：洗濯物をたたむ">
+      </div>
+      <label class="f">今回の報酬金額（変更できます）</label>
+      <input type="number" id="em_amount" value="">
+      <button class="btn btn-danger btn-block" style="margin-top:18px;" onclick="saveEmergency()">今日のホームに追加する</button>
+    </div>`;
+  openModal(html);
+  const sel = document.getElementById("em_choreSelect");
+  const syncAmount = ()=>{
+    if(sel.value==="__custom__"){ document.getElementById("em_customWrap").style.display="block"; document.getElementById("em_amount").value=50; }
+    else { document.getElementById("em_customWrap").style.display="none"; const c=state.chores.find(x=>x.id===sel.value); document.getElementById("em_amount").value = c? c.amount : 50; }
+  };
+  sel.onchange = syncAmount; syncAmount();
+}
+function saveEmergency(){
+  const sel = document.getElementById("em_choreSelect");
+  const amount = parseInt(document.getElementById("em_amount").value)||0;
+  let name, emoji="🚨";
+  if(sel.value==="__custom__"){ name = document.getElementById("em_customName").value.trim() || "緊急ミッション"; }
+  else { const c = state.chores.find(x=>x.id===sel.value); name = c.name; emoji = c.emoji; }
+  const ds = todayStr();
+  const log = getLog(ds);
+  log.emergencies.push({id:cid(), name, emoji, amount, done:false});
+  saveState(); closeModal(); renderHome();
+  toast("緊急ミッションを追加したよ！");
+}
+
+/* =========================================================================
+   PARENT DASHBOARD
+========================================================================= */
+function openParentDashboard(){
+  if(state.role!=="parent"){ toast("保護者モードでのみ利用できます"); return; }
+  const last14 = [];
+  for(let i=13;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); last14.push(todayStr(d)); }
+  const bars = last14.map(ds=>{
+    const log = state.dailyLog[ds];
+    const due = state.chores.filter(c=>isChoreDueToday(c,ds));
+    const doneCount = log? log.completed.length : 0;
+    const rate = due.length? Math.min(1, doneCount/due.length) : (log&&log.completed.length? 1:0);
+    return {ds, rate};
+  });
+  const maxH = 60;
+  const barsSvg = bars.map((b,i)=>{
+    const h = Math.max(4, maxH*b.rate);
+    const day = new Date(b.ds).getDate();
+    return `<rect x="${i*20+4}" y="${maxH-h}" width="12" height="${h}" rx="4" fill="${b.rate>=1?'#2FBFAE':(b.rate>0?'#FFC93C':'#F1E5D6')}"/>
+            <text x="${i*20+10}" y="${maxH+12}" font-size="8" text-anchor="middle" fill="#8C7B9B">${day}</text>`;
+  }).join("");
+
+  const streak = getStreak(state);
+  const totalEarned = state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>📊 見まもりダッシュボード</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <div class="stat-grid" style="margin:10px 0 16px;">
+        <div class="stat-box"><div class="v">${streak}日</div><div class="l">連続がんばり中</div></div>
+        <div class="stat-box"><div class="v">${fmtYen(totalEarned)}</div><div class="l">累計かせいだ金額</div></div>
+      </div>
+      <h2 style="font-size:13px; color:var(--plum-soft); margin:0 0 8px;">直近14日のたっせい率</h2>
+      <svg width="280" height="76" viewBox="0 0 280 76">${barsSvg}</svg>
+      <h2 style="font-size:13px; color:var(--plum-soft); margin:18px 0 8px;">ほめてあげよう</h2>
+      <textarea id="praiseText" placeholder="例：毎日お皿洗いがんばってるね！えらい！"></textarea>
+      <button class="btn btn-gold btn-block" style="margin-top:10px;" onclick="savePraise()">💌 メッセージを送る</button>
+      <div id="praiseLogWrap" style="margin-top:14px;"></div>
+    </div>`;
+  openModal(html);
+  renderPraiseLog();
+}
+function savePraise(){
+  const msg = document.getElementById("praiseText").value.trim();
+  if(!msg) return;
+  if(!state.praiseLog) state.praiseLog=[];
+  state.praiseLog.unshift({date:todayStr(), msg});
+  saveState();
+  document.getElementById("praiseText").value="";
+  renderPraiseLog();
+  toast("送ったよ！");
+}
+function renderPraiseLog(){
+  const wrap = document.getElementById("praiseLogWrap");
+  if(!wrap) return;
+  const log = state.praiseLog||[];
+  wrap.innerHTML = log.slice(0,6).map(p=>`<div class="ledger-row"><div class="ic" style="background:var(--gold-dark); color:#fff;">💌</div><div style="flex:1;"><div class="memo">${esc(p.msg)}</div><div class="date">${p.date}</div></div></div>`).join("");
+}
+
+/* =========================================================================
+   MONTHLY REFLECTION LOCK
+========================================================================= */
+function reflectionDue(){
+  const now = new Date();
+  const wk = startOfWeek(now);
+  const todayIdx = mondayIndex(now.getDay());
+  const targetIdx = mondayIndex(state.reflectionWeekday==null ? 0 : state.reflectionWeekday);
+  if(todayIdx >= targetIdx && state.lastReflectionWeek !== wk) return wk;
+  return null;
+}
+function buildReflectionStats(){
+  const income = state.transactions.filter(t=>t.type==="income" && !t._reflected).reduce((s,t)=>s+t.amount,0);
+  const expense = state.transactions.filter(t=>t.type==="expense" && !t._reflected).reduce((s,t)=>s+t.amount,0);
+  let doneDays=0, totalDueDays=0;
+  let extraAdded=0, extraCompleted=0;
+  let emergencyTotal=0, emergencyDone=0;
+  Object.keys(state.dailyLog).forEach(ds=>{
+    if(state._lastReflectedUpTo && ds<=state._lastReflectedUpTo) return;
+    const log = state.dailyLog[ds];
+    const due = state.chores.filter(c=>isChoreDueToday(c,ds) && c.priority==="must");
+    if(due.length){ totalDueDays++; if(due.every(c=>log.completed.includes(c.id))) doneDays++; }
+    const extra = log.extraOptional || [];
+    extraAdded += extra.length;
+    extraCompleted += extra.filter(id=>log.completed.includes(id)).length;
+    const emergencies = log.emergencies || [];
+    emergencyTotal += emergencies.length;
+    emergencyDone += emergencies.filter(e=>e.done).length;
+  });
+  const rate = totalDueDays? Math.round(doneDays/totalDueDays*100) : 0;
+  const emergencyRate = emergencyTotal? Math.round(emergencyDone/emergencyTotal*100) : null;
+  const gachaBonusTotal = state.transactions.filter(t=>t.type==="income" && !t._reflected && t.source==="gachaBonus").reduce((s,t)=>s+t.amount,0);
+  const gachaGiftTotal = state.transactions.filter(t=>t.type==="income" && !t._reflected && t.source==="gachaBonusGift").reduce((s,t)=>s+t.amount,0);
+  const achievedWishes = (state.wishlist||[]).filter(w=> w.done && w.doneDate && (!state._lastReflectedUpTo || w.doneDate>state._lastReflectedUpTo));
+  const walletIncomeTotal = state.transactions.filter(t=>t.type==="income" && !t._reflected && (t.bucket||"wallet")==="wallet").reduce((s,t)=>s+t.amount,0);
+  const savingsIncomeTotal = state.transactions.filter(t=>t.type==="income" && !t._reflected && t.bucket==="savings").reduce((s,t)=>s+t.amount,0);
+  const walletOwed = getBucketBalance("wallet");
+  return {income, expense, doneDays, totalDueDays, rate, extraAdded, extraCompleted, emergencyTotal, emergencyDone, emergencyRate, gachaBonusTotal, gachaGiftTotal, achievedWishes, walletIncomeTotal, savingsIncomeTotal, walletOwed};
+}
+
+function showReflectionLock(wk){
+  const stats = buildReflectionStats();
+  const prevReflection = state.reflections[wk] || {good:"", bad:"", negotiation:""};
+  const aiMsg = generateAiSummary(stats);
+
+  const overlay = document.createElement("div");
+  overlay.className="lock-screen"; overlay.id="reflectionLock";
+  overlay.innerHTML = `
+    <div class="lock-header">
+      <div class="em">🗓️✨</div>
+      <h2>今週の ふりかえりタイム</h2>
+      <p>おうちの人と いっしょに 見てね</p>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="v">${fmtYen(stats.income)}</div><div class="l">かせいだ金額</div></div>
+      <div class="stat-box"><div class="v">${stats.rate}%</div><div class="l">ぜったいタスク達成率</div></div>
+      <div class="stat-box"><div class="v">${stats.extraCompleted}/${stats.extraAdded}回</div><div class="l">自分で追加したお手伝い</div></div>
+      <div class="stat-box"><div class="v">${stats.emergencyRate!=null ? stats.emergencyRate+"%" : "—"}</div><div class="l">緊急ミッション達成率（${stats.emergencyDone}/${stats.emergencyTotal}）</div></div>
+      <div class="stat-box"><div class="v">${fmtYen(stats.gachaBonusTotal)}</div><div class="l">🎁ガチャボーナスで増えた金額</div></div>
+      <div class="stat-box"><div class="v">${fmtYen(stats.gachaGiftTotal)}</div><div class="l">🎟️ガチャ券プレゼントで増えた金額</div></div>
+    </div>
+    ${stats.achievedWishes.length ? `
+    <div class="ai-box" style="border-left-color:var(--success);">
+      <span class="tag" style="background:var(--success);">🎉 目標達成して買えたもの</span>
+      ${stats.achievedWishes.map(w=>`<p>${esc(w.name)}（${fmtYen(w.amount)}）</p>`).join("")}
+    </div>` : ``}
+    <div class="ai-box">
+      <span class="tag">🤖 かんたん分析</span>
+      ${aiMsg.map(p=>`<p>${p}</p>`).join("")}
+    </div>
+    <div class="card">
+      <h2>😊 今週 よかったこと（こども）</h2>
+      <textarea id="refGood" placeholder="がんばったこと、できるようになったこと">${esc(prevReflection.good)}</textarea>
+      <h2 style="margin-top:16px;">😣 今週 むずかしかったこと</h2>
+      <textarea id="refBad" placeholder="うまくいかなかったこと、こまったこと">${esc(prevReflection.bad)}</textarea>
+    </div>
+    <div class="card">
+      <h2>💭 新しく欲しいと思ったもの</h2>
+      <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">ここで追加すると、すぐに「ほしいものリスト」に反映されます。</p>
+      <label class="f">名前</label>
+      <input type="text" id="newWishName" placeholder="例：あたらしいくつ">
+      <label class="f">金額（円）</label>
+      <input type="number" id="newWishAmount" placeholder="例：4000">
+      <label class="f">いつまでに？（任意）</label>
+      <input type="date" id="newWishDeadline">
+      <button class="btn btn-mint btn-block" style="margin-top:12px;" id="btnAddWishFromReflection">＋ ほしいものリストに追加</button>
+    </div>
+    <div class="card">
+      <h2>🤝 お手伝いの相談（こうしょう）</h2>
+      <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">金額を変える・項目を増やす・周期を変える、など話し合ったことをメモしよう。実際の変更は「お手伝いリスト」画面から編集できます。</p>
+      <textarea id="refNego" placeholder="例：食器洗いを30円に値上げ／新しく『洗濯たたみ』を追加したい">${esc(prevReflection.negotiation)}</textarea>
+    </div>
+    <div class="card">
+      <h2>💵 今週のお金の受け渡し</h2>
+      <div class="stat-grid" style="margin:10px 0 0;">
+        <div class="stat-box"><div class="v">${fmtYen(stats.walletOwed)}</div><div class="l">👛 財布へ（現金でわたす）</div></div>
+        <div class="stat-box"><div class="v">${fmtYen(stats.savingsIncomeTotal)}</div><div class="l">🏦 貯金箱（口座）へ入れる</div></div>
+      </div>
+      <label style="display:flex; align-items:flex-start; gap:8px; margin-top:14px; font-size:13px; font-weight:700; line-height:1.5;">
+        <input type="checkbox" id="cashHandedCheck" style="width:20px; height:20px; flex-shrink:0; margin-top:1px;">
+        <span>現金 ${fmtYen(stats.walletOwed)} を こどもに わたしました（わたし忘れ防止のため、ここにチェックしないと終了できません）</span>
+      </label>
+    </div>
+    <div class="locked-banner" id="lockedBannerText">🔒 このふりかえりを終えるまで、通常のホーム画面には進めません。こどもと話しながら内容を確認し、おうちの人が「確認して終了」を押してください（パスワードが必要です）。</div>
+    <div style="padding:0 16px;">
+      <button class="btn btn-primary btn-block" id="btnFinishReflection">✅ 確認して終了・ホームへ</button>
+      <button class="btn btn-outline btn-block" id="btnSaveDraftReflection" style="margin-top:10px;">下書き保存（あとで続ける）</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById("btnFinishReflection").onclick = ()=>{
+    const walletOwed = stats.walletOwed;
+    const handedChecked = document.getElementById("cashHandedCheck").checked;
+    if(walletOwed>0 && !handedChecked){
+      toast("現金をわたしたら、チェックを入れてね");
+      return;
+    }
+    openPasswordModal("ふりかえりを終了する", ()=> finishReflection(wk, handedChecked && walletOwed>0));
+  };
+  document.getElementById("btnSaveDraftReflection").onclick = ()=>saveDraftReflection(wk);
+  document.getElementById("btnAddWishFromReflection").onclick = ()=>{
+    const name = document.getElementById("newWishName").value.trim();
+    if(!name){ toast("名前を入れてね"); return; }
+    const amount = parseInt(document.getElementById("newWishAmount").value)||0;
+    const deadline = document.getElementById("newWishDeadline").value;
+    if(!state.wishlist) state.wishlist=[];
+    state.wishlist.push({id:cid(), name, amount, deadline, done:false, doneDate:null});
+    saveState();
+    document.getElementById("newWishName").value="";
+    document.getElementById("newWishAmount").value="";
+    document.getElementById("newWishDeadline").value="";
+    toast(`「${name}」をほしいものリストに追加したよ！`);
+  };
+}
+function generateAiSummary(stats){
+  const msgs = [];
+  if(stats.totalDueDays===0){ msgs.push("まだデータが少ないよ。来週からの記録をお楽しみに！"); return msgs; }
+  if(stats.rate>=90) msgs.push(`達成率${stats.rate}%は、とてもすばらしいペースです！このまま続けていきましょう。`);
+  else if(stats.rate>=60) msgs.push(`達成率は${stats.rate}%でした。できている日も多いので、あと少しの声かけで習慣が安定しそうです。`);
+  else msgs.push(`達成率は${stats.rate}%でした。ハードルが高すぎないか、量や頻度を見直すタイミングかもしれません。`);
+  if(stats.income>0) msgs.push(`お手伝いで合計${stats.income.toLocaleString("ja-JP")}円をかせぎました。がんばりをぜひ言葉にして伝えてあげてください。`);
+  if(stats.expense>0) msgs.push(`使ったお金は合計${stats.expense.toLocaleString("ja-JP")}円でした。何に使ったか、お子さんと振り返ってみましょう。`);
+  return msgs;
+}
+function saveDraftReflection(wk){
+  state.reflections[wk] = {
+    good: document.getElementById("refGood").value,
+    bad: document.getElementById("refBad").value,
+    negotiation: document.getElementById("refNego").value,
+    confirmed:false
+  };
+  saveState();
+  toast("下書きを保存したよ");
+}
+function finishReflection(wk, cashHandedOver){
+  state.reflections[wk] = {
+    good: document.getElementById("refGood").value,
+    bad: document.getElementById("refBad").value,
+    negotiation: document.getElementById("refNego").value,
+    confirmed:true, confirmedAt: new Date().toISOString()
+  };
+  if(cashHandedOver){
+    const owed = getBucketBalance("wallet");
+    if(owed>0) addTransaction("expense", owed, "現金でおわたし済み（ふりかえり時に精算）", {bucket:"wallet", date:todayStr()});
+  }
+  state.lastReflectionWeek = wk;
+  state._lastReflectedUpTo = todayStr();
+  state.transactions.forEach(t=>t._reflected=true);
+  saveState();
+  document.getElementById("reflectionLock").remove();
+  renderAll();
+  toast("今週のふりかえり、おつかれさま！");
+}
+
+/* =========================================================================
+   REFLECTION HISTORY（履歴の閲覧・保護者のみ編集/削除）
+========================================================================= */
+function weekLabel(wk){
+  const d = new Date(wk);
+  const end = new Date(d); end.setDate(d.getDate()+6);
+  const fmt = x=> `${x.getMonth()+1}/${x.getDate()}`;
+  return `${fmt(d)}〜${fmt(end)}の週`;
+}
+function openReflectionHistory(){
+  const keys = Object.keys(state.reflections||{}).sort((a,b)=> b.localeCompare(a));
+  const isParent = state.role==="parent";
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>📖 ふりかえりの履歴</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      ${keys.length ? keys.map(wk=>{
+        const r = state.reflections[wk];
+        return `<div class="card" style="margin:0 0 12px;">
+          <div class="row-between">
+            <h2 style="margin:0;">${weekLabel(wk)}${r.confirmed?"":"（下書き）"}</h2>
+            ${isParent ? `<div class="row-actions"><button class="icon-btn" onclick="confirmEditReflection('${wk}')">✏️</button><button class="icon-btn" onclick="confirmDeleteReflection('${wk}')">🗑️</button></div>` : ``}
+          </div>
+          <div style="font-size:12.5px; margin-top:8px;"><b>😊 よかったこと：</b>${esc(r.good)||"（未記入）"}</div>
+          <div style="font-size:12.5px; margin-top:6px;"><b>😣 むずかしかったこと：</b>${esc(r.bad)||"（未記入）"}</div>
+          <div style="font-size:12.5px; margin-top:6px;"><b>🤝 相談メモ：</b>${esc(r.negotiation)||"（未記入）"}</div>
+        </div>`;
+      }).join("") : `<div class="empty-note">まだふりかえりの記録がありません</div>`}
+    </div>`;
+  openModal(html);
+}
+function openEditReflectionForm(wk){
+  if(state.role!=="parent"){ toast("保護者モードでのみ編集できます"); return; }
+  const r = state.reflections[wk] || {good:"",bad:"",negotiation:""};
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>${weekLabel(wk)}を編集</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">😊 よかったこと</label>
+      <textarea id="editRefGood">${esc(r.good)}</textarea>
+      <label class="f">😣 むずかしかったこと</label>
+      <textarea id="editRefBad">${esc(r.bad)}</textarea>
+      <label class="f">🤝 相談メモ</label>
+      <textarea id="editRefNego">${esc(r.negotiation)}</textarea>
+      <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="saveReflectionEdit('${wk}')">保存する</button>
+    </div>`;
+  openModal(html);
+}
+function saveReflectionEdit(wk){
+  if(state.role!=="parent"){ toast("保護者モードでのみ編集できます"); return; }
+  const r = state.reflections[wk] || {};
+  r.good = document.getElementById("editRefGood").value;
+  r.bad = document.getElementById("editRefBad").value;
+  r.negotiation = document.getElementById("editRefNego").value;
+  state.reflections[wk] = r;
+  saveState(); closeModal(); openReflectionHistory();
+  toast("保存したよ");
+}
+function confirmDeleteReflection(wk){
+  if(state.role!=="parent"){ toast("保護者モードでのみ削除できます"); return; }
+  openConfirmModal(`${weekLabel(wk)}のふりかえりを削除しますか？`, ()=>{
+    delete state.reflections[wk];
+    saveState(); openReflectionHistory();
+    toast("削除したよ");
+  }, "削除する", true);
+}
+
+/* =========================================================================
+   MODAL helpers
+========================================================================= */
+function openModal(html){
+  const root = document.getElementById("modalRoot");
+  root.innerHTML = `<div class="overlay" id="overlayEl"><div class="sheet">${html}</div></div>`;
+  document.getElementById("overlayEl").addEventListener("click", e=>{ if(e.target.id==="overlayEl") closeModal(); });
+}
+function closeModal(){ document.getElementById("modalRoot").innerHTML=""; }
+
+/* ---------------- Confirmation modal（編集・削除の誤操作防止） ---------------- */
+function openConfirmModal(message, onConfirm, confirmLabel, isDanger){
+  confirmLabel = confirmLabel || "はい";
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>かくにん</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px 10px;">
+      <p style="font-size:14.5px; font-weight:700; text-align:center; margin:6px 0 20px; line-height:1.6;">${esc(message)}</p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-outline btn-block" onclick="closeModal()">キャンセル</button>
+        <button class="btn ${isDanger ? "btn-danger" : "btn-primary"} btn-block" id="confirmActionBtn">${esc(confirmLabel)}</button>
+      </div>
+    </div>`;
+  openModal(html);
+  document.getElementById("confirmActionBtn").onclick = ()=>{ closeModal(); onConfirm(); };
+}
+function confirmEditChore(id){
+  openConfirmModal("このお手伝いを編集しますか？", ()=> openChoreForm(id), "編集する", false);
+}
+function confirmEditTx(id){
+  openConfirmModal("この記録を編集しますか？", ()=> openEditTxForm(id), "編集する", false);
+}
+function confirmEditReflection(wk){
+  openConfirmModal("このふりかえりを編集しますか？", ()=> openEditReflectionForm(wk), "編集する", false);
+}
+
+/* ---------------- 連続達成ガチャの演出モーダル ---------------- */
+function gachaCatalogHtml(prizesInOrder){
+  // 子供向け：確率(%)は見せず、ランクと金額だけを見せる。LRに近いほど大きく目立たせる
+  const ranks = computeRanks(prizesInOrder);
+  const order = {LR:0, UR:1, SSR:2, SR:3, R:4};
+  const withRank = prizesInOrder.map((p,i)=>({amount:p.amount, rank:ranks[i]}));
+  withRank.sort((a,b)=> (order[a.rank]??9) - (order[b.rank]??9));
+  return withRank.map(p=>`
+    <div class="item size-${p.rank}"><span class="grade-tag rank-${p.rank}">${p.rank}</span>${p.amount}円</div>
+  `).join("");
+}
+function openGachaponModal(catalogPrizes, label, onDraw, opts){
+  opts = opts || {};
+  const catalog = gachaCatalogHtml(catalogPrizes);
+  const destText = opts.destText || "貯金箱に　ついかされたよ！";
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>🎁 ${esc(label)}のガチャガチャ！</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:6px 20px 24px; text-align:center;">
+      <div class="gm-wrap">
+        <div class="gm-dome" id="gmDome"><div class="gm-capsules">🔴🟡🟢🔵🟣🟠🔴🟡🟢🔵🟣🟠🔴🟡</div></div>
+        <div class="gm-base">
+          <div class="gm-slot"></div>
+          <div class="gm-handle" id="gmKnob"><div class="gm-handle-arm"></div><div class="gm-handle-grip"></div></div>
+        </div>
+        <div class="gm-capsule-drop" id="gmCapsuleDrop">🥚</div>
+      </div>
+      <div class="section-label" style="margin:14px 0 8px; text-align:left;">🎁 出てくるかもしれない景品</div>
+      <div class="wheel-legend">${catalog}</div>
+      <div style="display:flex; gap:8px; margin-top:16px;" id="gachaBtnRow">
+        <button class="btn btn-outline btn-block" id="gachaLaterBtn">あとで回す</button>
+        <button class="btn btn-gold btn-block" id="gachaSpinBtn">🎮 ガチャをまわす！</button>
+      </div>
+      <div class="gacha-rank-reveal" id="gachaRankReveal"></div>
+      <p style="font-size:12px; color:var(--plum-soft); margin-top:8px;">${opts.real===false ? "（練習：実際のお金は増えません）" : ""}</p>
+      <button class="btn btn-primary btn-block" style="margin-top:10px; display:none;" id="gachaCloseBtn">とじる</button>
+    </div>`;
+  openModal(html);
+  const spinBtn = document.getElementById("gachaSpinBtn");
+  const laterBtn = document.getElementById("gachaLaterBtn");
+  const closeBtn = document.getElementById("gachaCloseBtn");
+  laterBtn.onclick = ()=>{ closeModal(); if(opts.onClose) opts.onClose(); };
+  spinBtn.onclick = ()=>{
+    spinBtn.disabled = true;
+    laterBtn.style.display = "none";
+    spinBtn.textContent = "まわしてるよ...";
+    const outcome = onDraw(); // 実際の抽選＋データ更新はここで行われる
+    const dome = document.getElementById("gmDome");
+    const knob = document.getElementById("gmKnob");
+    const drop = document.getElementById("gmCapsuleDrop");
+    setTimeout(()=>{ dome.classList.add("shaking"); knob.classList.add("turning"); }, 150);
+    setTimeout(()=>{ drop.classList.add("drop"); }, 3900);
+    setTimeout(()=>{
+      const reveal = document.getElementById("gachaRankReveal");
+      reveal.innerHTML = `
+        <div class="grr-burst">✨ あたり！！ ✨</div>
+        <div class="grr-badge rank-${outcome.rank}">${outcome.rank}</div>
+        <div class="grr-amount">+${outcome.amount}円</div>
+        <div class="grr-sub">${opts.real===false ? "練習だよ！" : destText}</div>`;
+      reveal.classList.add("show");
+      document.getElementById("gachaBtnRow").style.display = "none";
+      closeBtn.style.display = "flex";
+    }, 5000);
+  };
+  closeBtn.onclick = ()=>{ closeModal(); if(opts.onClose) opts.onClose(); };
+}
+function drawGachaNow(){
+  if(state.role!=="child"){ toast("こどもモードでガチャガチャを引けます"); return; }
+  const pending = state.pendingGachaDraws || [];
+  if(!pending.length) return;
+  const draw = pending[0];
+  const configuredPrizes = ((state.streakGacha && state.streakGacha.prizes) || []).filter(p=>p.percent>0 && p.amount>0);
+  if(!configuredPrizes.length){ toast("景品が設定されていません。おうちの人に聞いてね"); return; }
+  const isGift = draw.type==="gift";
+  openGachaponModal(configuredPrizes, draw.label, ()=>{
+    const result = spinGachaFull(configuredPrizes);
+    const ranks = computeRanks(result.prizes);
+    const rank = ranks[result.index];
+    state.pendingGachaDraws = (state.pendingGachaDraws||[]).filter(d=>d.id!==draw.id);
+    const source = isGift ? "gachaBonusGift" : "gachaBonus";
+    const memoLabel = isGift ? `${draw.label}景品（${rank}）` : `${draw.label}ガチャガチャ景品（${rank}）`;
+    addTransaction("income", result.amount, memoLabel, {source, bucket:"savings", refId:draw.id, date:todayStr()});
+    pushNotification(`🎉${isGift?"ガチャ券":"ガチャガチャ"}で【${rank}】${result.amount}円が当たったよ！貯金箱に追加したよ`);
+    saveState(); renderHome();
+    return {amount: result.amount, rank};
+  }, {real:true, destText: "貯金箱に　ついかされたよ！"});
+}
+
+/* ---------------- Password confirmation (parent-only actions) ---------------- */
+function openPasswordModal(title, onSuccess){
+  const needCreate = fbEnabled ? false : !state.parentPassword;
+  const promptLabel = fbEnabled ? "かぞく共通のパスワード（Firebaseログイン用）を入力してください" : "パスワードを入力してください";
+  const html = needCreate ? `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>${esc(title)}</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <p style="font-size:12.5px; color:var(--plum-soft);">まだパスワードが設定されていません。ここで作成してください。</p>
+      <label class="f">新しいパスワード（4文字以上）</label>
+      <input type="password" id="pw_new1">
+      <label class="f">もう一度入力</label>
+      <input type="password" id="pw_new2">
+      <div id="pw_err" style="color:var(--danger); font-size:12px; margin-top:6px;"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" id="pwSubmitBtn">設定して進む</button>
+    </div>` : `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>${esc(title)}</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px;">
+      <label class="f">${promptLabel}</label>
+      <input type="password" id="pw_input">
+      <div id="pw_err" style="color:var(--danger); font-size:12px; margin-top:6px;"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" id="pwSubmitBtn">確認する</button>
+    </div>`;
+  openModal(html);
+  window._pwOnSuccess = onSuccess;
+  document.getElementById("pwSubmitBtn").onclick = needCreate ? submitPasswordCreate : submitPasswordCheck;
+}
+function submitPasswordCreate(){
+  const p1 = document.getElementById("pw_new1").value;
+  const p2 = document.getElementById("pw_new2").value;
+  if(p1.length<4){ document.getElementById("pw_err").textContent="4文字以上で入力してください"; return; }
+  if(p1!==p2){ document.getElementById("pw_err").textContent="パスワードが一致しません"; return; }
+  state.parentPassword = p1; saveState();
+  closeModal(); window._pwOnSuccess && window._pwOnSuccess();
+}
+function submitPasswordCheck(){
+  const p = document.getElementById("pw_input").value;
+  if(fbEnabled && auth.currentUser){
+    auth.signInWithEmailAndPassword(auth.currentUser.email, p).then(()=>{
+      closeModal(); window._pwOnSuccess && window._pwOnSuccess();
+    }).catch(()=>{
+      document.getElementById("pw_err").textContent = "パスワードが違います";
+    });
+    return;
+  }
+  if(p !== state.parentPassword){ document.getElementById("pw_err").textContent="パスワードが違います"; return; }
+  closeModal(); window._pwOnSuccess && window._pwOnSuccess();
+}
+
+/* =========================================================================
+   NAV / ROLE
+========================================================================= */
+function switchScreen(name){
+  if(name==="settings" && state.role!=="parent"){ toast("保護者モードでのみ利用できます"); return; }
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById("screen-"+name).classList.add("active");
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.screen===name));
+  if(name==="home") renderHome();
+  if(name==="chores") renderChores();
+  if(name==="ledger") renderLedger();
+  if(name==="settings") renderSettings();
+}
+function buildTabbar(){
+  const tabs = [
+    {id:"home", ic:"🏠", label:"ホーム"},
+    {id:"chores", ic:"📋", label:"お手伝い"},
+    {id:"ledger", ic:"👛", label:"おこづかい帖"},
+  ];
+  if(state.role==="parent") tabs.push({id:"settings", ic:"⚙️", label:"せってい"});
+  const bar = document.getElementById("tabbar");
+  bar.innerHTML = tabs.map(t=>`<button class="tab" data-screen="${t.id}"><div class="ic">${t.ic}</div>${t.label}</button>`).join("");
+  document.querySelectorAll(".tab").forEach(t=> t.onclick = ()=> switchScreen(t.dataset.screen));
+  const activeEl = document.querySelector(".screen.active");
+  const activeName = activeEl ? activeEl.id.replace("screen-","") : "home";
+  if(!tabs.find(t=>t.id===activeName)) switchScreen("home");
+  else document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.screen===activeName));
+}
+function applyRoleUI(){
+  const isParent = state.role==="parent";
+  document.getElementById("roleLabel").textContent = isParent? "おうちの人":"こども";
+  document.getElementById("rolePill").classList.toggle("parent", isParent);
+  document.getElementById("rolePill").style.cursor = state.deviceType==="child" ? "default" : "pointer";
+  document.getElementById("fabEmergency").style.display = isParent? "flex":"none";
+  document.getElementById("fabGiftGacha").style.display = isParent? "flex":"none";
+  document.getElementById("bellWrap").style.display = isParent? "flex":"none";
+  updateBellBadge();
+  buildTabbar();
+}
+function toggleRole(){
+  if(state.deviceType==="child"){
+    toast("この端末ではモードを切り替えられません");
+    return;
+  }
+  if(state.role==="parent"){
+    state.role="child"; saveState(); applyRoleUI(); switchScreen("home");
+    toast("こども視点プレビューに切り替えたよ");
+  } else {
+    openPasswordModal("親モードにもどる", ()=>{
+      state.role="parent"; saveState(); applyRoleUI(); switchScreen("home");
+      toast("おうちの人モードにもどったよ");
+    });
+  }
+}
+
+function renderAll(){
+  applyRoleUI();
+  renderHome(); renderChores(); renderLedger();
+  if(state.role==="parent") renderSettings();
+  const mk = reflectionDue();
+  if(mk) showReflectionLock(mk);
+}
+function renderBadgesMaybe(){ /* badge row refreshed inside renderHome */ }
+
+/* =========================================================================
+   EVENT WIRING
+========================================================================= */
+let pendingDeviceType = "child";
+function selectDeviceType(t){
+  pendingDeviceType = t;
+  document.getElementById("pickChildDevice").classList.toggle("sel", t==="child");
+  document.getElementById("pickParentDevice").classList.toggle("sel", t==="parent");
+  if(!fbEnabled){
+    document.getElementById("parentPassWrap").style.display = t==="parent" ? "block" : "none";
+    document.getElementById("childPassWrap").style.display = t==="child" ? "block" : "none";
+  }
+}
+document.getElementById("pickChildDevice").onclick = ()=> selectDeviceType("child");
+document.getElementById("pickParentDevice").onclick = ()=> selectDeviceType("parent");
+selectDeviceType("child");
+if(fbEnabled){
+  document.getElementById("parentPassWrap").style.display = "none";
+  document.getElementById("childPassWrap").style.display = "none";
+  document.getElementById("loginFooterNote").textContent = "※つぎの画面で、かぞく共通のメールアドレスとパスワードでログインします。";
+}
+
+function enterApp(){
+  document.getElementById("screen-login").style.display = "none";
+  document.getElementById("screen-fblogin").style.display = "none";
+  document.getElementById("mainApp").style.display = "block";
+  document.getElementById("tabbar").style.display = "flex";
+  renderAll();
+}
+
+document.getElementById("btnEnter").onclick = ()=>{
+  const fn = document.getElementById("familyNameInput").value.trim();
+  if(fn) state.familyName = fn;
+  state.deviceType = pendingDeviceType;
+  state.role = pendingDeviceType; // "parent" or "child"
+  if(!fbEnabled){
+    if(pendingDeviceType==="parent"){
+      const p1 = document.getElementById("newPassInput").value;
+      const p2 = document.getElementById("newPassInput2").value;
+      if(p1.length<4){ toast("パスワードは4文字以上にしてね"); return; }
+      if(p1!==p2){ toast("パスワードが一致しません"); return; }
+      state.parentPassword = p1;
+    } else {
+      const cp = document.getElementById("childKnownPassInput").value;
+      if(cp) state.parentPassword = cp;
+    }
+    saveState();
+    enterApp();
+    return;
+  }
+  // Firebaseが有効な場合：先にデバイス種別だけローカルに保存し、ログイン画面へ
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  document.getElementById("screen-login").style.display = "none";
+  document.getElementById("screen-fblogin").style.display = "block";
+};
+
+function fbShowError(msg){ document.getElementById("fbLoginErr").textContent = msg; }
+document.getElementById("btnFbSignIn").onclick = ()=>{
+  const email = document.getElementById("fbEmailInput").value.trim();
+  const pw = document.getElementById("fbPasswordInput").value;
+  if(!email || pw.length<6){ fbShowError("メールアドレスと6文字以上のパスワードを入力してね"); return; }
+  auth.signInWithEmailAndPassword(email, pw).then(cred=>{
+    attachFamilySync(cred.user.uid);
+    enterApp();
+  }).catch(e=>{ fbShowError("ログインできませんでした："+(e.message||e.code)); });
+};
+document.getElementById("btnFbSignUp").onclick = ()=>{
+  const email = document.getElementById("fbEmailInput").value.trim();
+  const pw = document.getElementById("fbPasswordInput").value;
+  if(!email || pw.length<6){ fbShowError("メールアドレスと6文字以上のパスワードを入力してね"); return; }
+  auth.createUserWithEmailAndPassword(email, pw).then(cred=>{
+    attachFamilySync(cred.user.uid);
+    familyDocRef.set(state).catch(e=>console.warn(e));
+    enterApp();
+  }).catch(e=>{ fbShowError("作成できませんでした："+(e.message||e.code)); });
+};
+
+document.getElementById("rolePill").onclick = toggleRole;
+document.getElementById("fabEmergency").onclick = openEmergencyPicker;
+document.getElementById("fabGiftGacha").onclick = openGiftGachaModal;
+
+document.getElementById("btnAddChore").onclick = ()=> openChoreForm(null);
+document.getElementById("btnAddExpense").onclick = openExpenseForm;
+document.getElementById("btnAddBonusToday").onclick = openAddBonusChoreModal;
+document.getElementById("btnDrawGacha").onclick = drawGachaNow;
+document.getElementById("btnAddWishlistItem").onclick = openAddWishlistForm;
+document.getElementById("btnSaveGoal").onclick = saveGoal;
+document.getElementById("btnSaveReflectionDay").onclick = saveReflectionDay;
+document.getElementById("btnOpenReflectionHistory").onclick = openReflectionHistory;
+document.getElementById("btnOpenParentDash").onclick = openParentDashboard;
+document.getElementById("btnOpenReflectionNow").onclick = ()=> showReflectionLock(startOfWeek(new Date()));
+document.getElementById("btnExportData").onclick = exportData;
+document.getElementById("btnResetData").onclick = resetData;
+document.getElementById("btnSaveSavingsRule").onclick = saveSavingsRule;
+document.getElementById("btnAddGachaPrize").onclick = addGachaPrize;
+document.getElementById("btnSaveGacha").onclick = saveGacha;
+document.getElementById("btnTestGacha").onclick = testGachaSpin;
+document.getElementById("btnSetBalances").onclick = setBalances;
+document.getElementById("btnChangePassword").onclick = changeParentPassword;
+document.getElementById("btnFbSignOut").onclick = ()=>{
+  openConfirmModal("この端末でログアウトしますか？次回からまたログインが必要になります。", ()=>{
+    if(auth) auth.signOut();
+    location.reload();
+  }, "ログアウトする", true);
+};
+["subgoalAmountInput","subgoalDeadlineInput"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", updateDailyNeedPreview);
+});
+
+/* ---------------- Boot: skip login if returning user ---------------- */
+(function boot(){
+  const deviceConfigured = !!localStorage.getItem(STORAGE_KEY);
+  if(fbEnabled){
+    auth.onAuthStateChanged(user=>{
+      if(user){
+        attachFamilySync(user.uid);
+        if(deviceConfigured) enterApp();
+        // 端末側の種別が未設定なら screen-login（初期状態でactive）のまま待機
+      } else {
+        if(deviceConfigured){
+          // この端末は設定済みだが、まだこのブラウザではログインしていない
+          document.getElementById("screen-login").style.display = "none";
+          document.getElementById("screen-fblogin").style.display = "block";
+        }
+        // 未設定ならscreen-login（端末選択）から開始
+      }
+    });
+  } else {
+    if(deviceConfigured) enterApp();
+  }
+})();
+</script>
+</body>
+</html>
