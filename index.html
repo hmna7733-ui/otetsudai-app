@@ -149,10 +149,16 @@ body{
   background:var(--line); color:var(--plum); border-radius:999px; font-size:11px; padding:2px 9px;
 }
 .task-card{
-  display:flex; align-items:center; gap:12px;
+  display:flex; align-items:center; gap:12px; position:relative;
   background:var(--card); border-radius:18px; padding:14px 14px;
   margin:0 16px 10px; box-shadow:var(--shadow); border:2px solid transparent;
   transition:transform .15s ease;
+}
+.skip-today-btn{
+  position:absolute; right:12px; bottom:8px;
+  font-size:10.5px; font-weight:800; color:var(--plum-soft);
+  background:#fff; border:1.5px solid var(--line); border-radius:999px;
+  padding:3px 10px;
 }
 .task-card.done{opacity:.5;}
 .task-card.emergency{background:var(--danger-light); border-color:var(--danger);}
@@ -672,7 +678,7 @@ textarea{resize:vertical; min-height:70px;}
 
       <div id="emergencySection"></div>
 
-      <div class="task-group-title">🔥 きょう ぜったいやる <span class="count" id="mustCount">0</span></div>
+      <div class="task-group-title">🔥 きょう ぜったいやる <span class="count" id="mustCount">0</span><span id="streakBadgeText" style="margin-left:auto; font-size:11.5px; color:var(--danger); font-weight:800;"></span></div>
       <div id="mustTaskList"></div>
 
       <div class="task-group-title">✨ やってもいい（ボーナス） <span class="count" id="optCount">0</span></div>
@@ -1080,6 +1086,8 @@ function fmtYen(n){ return (n||0).toLocaleString("ja-JP")+"円"; }
 
 /* ---------------- Chore scheduling ---------------- */
 function isChoreDueToday(chore, dateStr){
+  const log = state.dailyLog && state.dailyLog[dateStr];
+  if(log && log.skippedMust && log.skippedMust.includes(chore.id)) return false;
   const d = new Date(dateStr);
   const c = chore.cycle;
   if(c.type==="daily") return true;
@@ -1318,6 +1326,8 @@ function renderHome(){
   must = sortByDeadline(must);
   opt = sortByDeadline(opt);
   document.getElementById("mustCount").textContent = must.length;
+  const streakNow = getStreak(state);
+  document.getElementById("streakBadgeText").textContent = streakNow>0 ? `🔥${streakNow}日連続達成中` : "";
   document.getElementById("optCount").textContent = opt.length;
   document.getElementById("mustTaskList").innerHTML = must.map(c=>taskCardHtml(c, log)).join("") || `<div class="empty-note">今日の必須タスクはないよ</div>`;
   document.getElementById("optTaskList").innerHTML = opt.map(c=>taskCardHtml(c, log)).join("") || `<div class="empty-note">今日のボーナスタスクはないよ</div>`;
@@ -1348,7 +1358,9 @@ function renderHome(){
 
 function taskCardHtml(c, log){
   const done = log.completed.includes(c.id);
-  return `<div class="task-card ${done?"done":""} ${c.priority!=="must"?"optional":""}">
+  const isParent = state.role==="parent";
+  const showSkip = c.priority==="must" && isParent && !done;
+  return `<div class="task-card ${done?"done":""} ${c.priority!=="must"?"optional":""}" ${showSkip?'style="padding-bottom:36px;"':''}>
     <div class="task-emoji">${c.emoji||"🧹"}</div>
     <div class="task-info">
       <div class="name ${done?"done-text":""}">${esc(c.name)}</div>
@@ -1357,7 +1369,22 @@ function taskCardHtml(c, log){
     </div>
     <div class="task-amount">+${c.amount}円</div>
     <button class="check-btn ${done?"checked":""}" onclick="toggleChore('${c.id}', event)">${done?"✓":""}</button>
+    ${showSkip ? `<button class="skip-today-btn" onclick="skipToday('${c.id}', event)">今日はなし</button>` : ``}
   </div>`;
+}
+function skipToday(choreId, ev){
+  if(ev) ev.stopPropagation();
+  if(state.role!=="parent"){ toast("保護者モードでのみ使えます"); return; }
+  const chore = state.chores.find(c=>c.id===choreId);
+  if(!chore) return;
+  openConfirmModal(`「${chore.name}」は今日はやらなくてよいことにしますか？`, ()=>{
+    const ds = todayStr();
+    const log = getLog(ds);
+    if(!log.skippedMust) log.skippedMust=[];
+    if(!log.skippedMust.includes(choreId)) log.skippedMust.push(choreId);
+    saveState(); renderHome();
+    toast("今日はおやすみにしたよ");
+  }, "今日はなしにする", false);
 }
 function emergencyCardHtml(e, log){
   const done = !!e.done;
