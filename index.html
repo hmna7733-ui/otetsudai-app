@@ -715,7 +715,7 @@ textarea{resize:vertical; min-height:70px;}
       <div class="streak-banner" id="streakBanner" style="display:none;">
         <div class="streak-fire">🔥</div>
         <div class="streak-info">
-          <div class="streak-days">れんぞく<span id="streakDaysNum">0</span>日目！！</div>
+          <div class="streak-days" id="streakDaysLine">れんぞく<span id="streakDaysNum">0</span>日目！！</div>
           <div class="streak-cheer" id="streakCheerText">よし やるぞ！</div>
         </div>
       </div>
@@ -1205,6 +1205,19 @@ function streakCheerMessage(n){
   if(n>=3) return "その調子！";
   return "いいスタート！よし やるぞ！";
 }
+function getStreakThroughYesterday(s=state){
+  let streak=0; let d=new Date(); d.setDate(d.getDate()-1);
+  while(true){
+    const ds=todayStr(d);
+    const log=s.dailyLog[ds];
+    const hadMust = (s.chores||[]).some(c=>c.priority==="must" && isChoreDueToday(c, ds));
+    const doneMust = log && (s.chores||[]).filter(c=>c.priority==="must" && isChoreDueToday(c,ds)).every(c=>log.completed.includes(c.id));
+    if(hadMust && doneMust){ streak++; d.setDate(d.getDate()-1); }
+    else break;
+    if(streak>=30) break;
+  }
+  return streak;
+}
 function getStreak(s=state){
   let streak=0; let d=new Date();
   while(true){
@@ -1375,14 +1388,25 @@ function renderHome(){
   must = sortByDeadline(must);
   opt = sortByDeadline(opt);
   document.getElementById("mustCount").textContent = must.length;
-  const streakNow = getStreak(state);
   const streakBanner = document.getElementById("streakBanner");
-  if(streakNow>0){
-    streakBanner.style.display = "flex";
-    document.getElementById("streakDaysNum").textContent = streakNow;
-    document.getElementById("streakCheerText").textContent = streakCheerMessage(streakNow);
+  const streakDaysLine = document.getElementById("streakDaysLine");
+  const streakCheerText = document.getElementById("streakCheerText");
+  const dueMustToday = state.chores.filter(c=>c.priority==="must" && isChoreDueToday(c, ds));
+  const todayAllMustDone = dueMustToday.length>0 && dueMustToday.every(c=>log.completed.includes(c.id));
+  streakBanner.style.display = "flex";
+  if(todayAllMustDone){
+    const streakNow = getStreak(state);
+    streakDaysLine.innerHTML = `れんぞく<span>${streakNow}</span>日目 達成！！`;
+    streakCheerText.textContent = streakCheerMessage(streakNow);
   } else {
-    streakBanner.style.display = "none";
+    const priorStreak = getStreakThroughYesterday(state);
+    if(priorStreak>0){
+      streakDaysLine.innerHTML = `れんぞく<span>${priorStreak}</span>日目 れんぞく中！`;
+      streakCheerText.textContent = `今日もやれば${priorStreak+1}日目！よし やるぞ！🔥`;
+    } else {
+      streakDaysLine.innerHTML = `今日から 挑戦！`;
+      streakCheerText.textContent = "1日目を目指して がんばろう！";
+    }
   }
   document.getElementById("optCount").textContent = opt.length;
   document.getElementById("mustTaskList").innerHTML = must.map(c=>taskCardHtml(c, log)).join("") || `<div class="empty-note">今日の必須タスクはないよ</div>`;
