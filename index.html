@@ -100,6 +100,25 @@ body{
   font-size:12px; font-weight:800; color:var(--plum-soft);
   letter-spacing:.03em; margin:22px 20px 8px; display:flex; align-items:center; gap:6px;
 }
+.cal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+.cal-month-label{font-size:14px; font-weight:800; color:var(--plum);}
+.cal-nav{background:#fff; border:1.5px solid var(--line); border-radius:10px; width:32px; height:32px; font-size:16px; font-weight:800; color:var(--plum-soft);}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+.cal-cell{background:#fff; border-radius:10px; padding:4px 1px; text-align:center; min-height:52px; box-shadow:var(--shadow);}
+.cal-cell.head{background:transparent; box-shadow:none; font-size:10px; font-weight:800; color:var(--plum-soft); min-height:auto; padding:2px 0;}
+.cal-cell.empty{background:transparent; box-shadow:none;}
+.cal-cell.today{border:2px solid var(--danger);}
+.cal-day-num{font-size:10.5px; font-weight:800; color:var(--plum);}
+.cal-hanamaru{font-size:11px;}
+.cal-amt{font-size:8px; line-height:1.35; font-weight:700;}
+.cal-amt.earn{color:var(--success);}
+.cal-amt.spend{color:var(--danger);}
+.cal-legend{font-size:10.5px; color:var(--plum-soft); text-align:center; margin-top:8px;}
+.day-detail-row{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:10px 0; border-bottom:1px solid var(--line); font-size:13.5px;
+}
+.day-detail-row:last-of-type{border-bottom:none;}
 
 /* ---------- Balance hero ---------- */
 .balance-hero{
@@ -731,6 +750,8 @@ textarea{resize:vertical; min-height:70px;}
         <div class="month-stat-card spend"><div class="msc-emoji">🛍️</div><div class="msc-label">今月つかったお金</div><div class="msc-value" id="monthExpense">0円</div></div>
       </div>
       <div style="margin:14px 16px 0;"><button class="btn btn-softred btn-block" id="btnAddExpense">💸 つかったお金を記録する</button></div>
+      <div class="section-label">🗓️ カレンダー</div>
+      <div id="ledgerCalendarWrap" style="margin:0 16px 8px;"></div>
       <div class="section-label">📜 りれき</div>
       <div class="ledger-group-card">
         <div class="ledger-group-head" onclick="toggleLedgerGroup('income')">
@@ -1769,7 +1790,104 @@ function saveChoreForm(existingId){
 /* =========================================================================
    RENDER: LEDGER
 ========================================================================= */
+let ledgerCalMonth = null;
+function renderLedgerCalendar(){
+  const wrap = document.getElementById("ledgerCalendarWrap");
+  if(!wrap) return;
+  if(!ledgerCalMonth) ledgerCalMonth = todayStr().slice(0,7);
+  const [y,m] = ledgerCalMonth.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const startWeekday = new Date(y, m-1, 1).getDay();
+  const isParent = state.role==="parent";
+
+  let cells = "";
+  for(let i=0;i<startWeekday;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const ds = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const dayTx = state.transactions.filter(t=>t.date===ds);
+    const earned = dayTx.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+    const spent = dayTx.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+    const dueMust = state.chores.filter(c=>c.priority==="must" && isChoreDueToday(c, ds));
+    const log = state.dailyLog[ds];
+    const allDone = dueMust.length>0 && log && dueMust.every(c=>log.completed.includes(c.id));
+    const isToday = ds===todayStr();
+    cells += `<div class="cal-cell ${isToday?"today":""}" ${isParent?`onclick="openDayDetail('${ds}')"`:""}>
+      <div class="cal-day-num">${d}${allDone?' <span class="cal-hanamaru">💮</span>':""}</div>
+      <div class="cal-amt earn">+${earned}</div>
+      <div class="cal-amt spend">-${spent}</div>
+    </div>`;
+  }
+  wrap.innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav" onclick="shiftLedgerCalMonth(-1)">‹</button>
+      <div class="cal-month-label">${y}年${m}月</div>
+      <button class="cal-nav" onclick="shiftLedgerCalMonth(1)">›</button>
+    </div>
+    <div class="cal-grid">
+      ${["日","月","火","水","木","金","土"].map(w=>`<div class="cal-cell head">${w}</div>`).join("")}
+      ${cells}
+    </div>
+    <div class="cal-legend">💮 きょうぜったいやる を全部達成した日${isParent?"（日付をタップすると詳しく見られます）":""}</div>
+  `;
+}
+function shiftLedgerCalMonth(delta){
+  const [y,m] = ledgerCalMonth.split("-").map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  ledgerCalMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  renderLedgerCalendar();
+}
+function openDayDetail(ds){
+  if(state.role!=="parent") return;
+  const dayTx = state.transactions.filter(t=>t.date===ds);
+  const earned = dayTx.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
+  const spent = dayTx.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+  const log = state.dailyLog[ds] || {completed:[], skippedMust:[]};
+  const dueMust = state.chores.filter(c=>c.priority==="must" && isChoreDueToday(c, ds));
+  const rows = dueMust.map(c=>{
+    const done = log.completed.includes(c.id);
+    if(done) return `<div class="day-detail-row"><span>${c.emoji||"🧹"} ${esc(c.name)}</span><span class="tag" style="background:var(--success);">✓ 完了</span></div>`;
+    return `<div class="day-detail-row">
+      <span>${c.emoji||"🧹"} ${esc(c.name)}</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-mint btn-sm" onclick="markChoreDoneRetro('${c.id}','${ds}')">✓ 完了にする</button>
+        <button class="btn btn-outline btn-sm" onclick="skipChoreRetro('${c.id}','${ds}')">なかったことに</button>
+      </div>
+    </div>`;
+  }).join("") || `<div class="empty-note">この日はぜったいタスクの予定がなかったよ</div>`;
+  const [yy,mm,dd] = ds.split("-");
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>${yy}年${parseInt(mm)}月${parseInt(dd)}日</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px 16px;">
+      <div style="display:flex; gap:10px; margin-bottom:14px;">
+        <div class="stat-box" style="flex:1; background:var(--mint-light); border-radius:14px; padding:10px; text-align:center;"><div style="font-size:11px; color:var(--plum-soft);">かせいだ</div><div style="font-weight:800; color:var(--success);">+${earned}円</div></div>
+        <div class="stat-box" style="flex:1; background:#FFF0EE; border-radius:14px; padding:10px; text-align:center;"><div style="font-size:11px; color:var(--plum-soft);">つかった</div><div style="font-weight:800; color:var(--danger);">-${spent}円</div></div>
+      </div>
+      <label class="f">きょう ぜったいやる（${ds}）</label>
+      ${rows}
+      <p style="font-size:11px; color:var(--plum-soft); margin-top:12px; line-height:1.6;">「完了にする」は実際にやったことにしてお金を渡します。「なかったことに」は、この日はやらなくてよかったことにして、達成日として扱います。</p>
+    </div>`;
+  openModal(html);
+}
+function markChoreDoneRetro(choreId, ds){
+  const log = getLog(ds);
+  if(log.completed.includes(choreId)){ closeModal(); return; }
+  const chore = state.chores.find(c=>c.id===choreId);
+  if(!chore) return;
+  log.completed.push(choreId);
+  addIncomeSplit(chore.amount, `${chore.name}（さかのぼって完了）`, {source:"chore", refId:chore.id, date:ds});
+  saveState(); closeModal(); openDayDetail(ds); renderLedgerCalendar();
+  toast("完了にしたよ");
+}
+function skipChoreRetro(choreId, ds){
+  const log = getLog(ds);
+  if(!log.skippedMust) log.skippedMust=[];
+  if(!log.skippedMust.includes(choreId)) log.skippedMust.push(choreId);
+  saveState(); closeModal(); openDayDetail(ds); renderLedgerCalendar();
+  toast("この日はやらなくてよかったことにしたよ");
+}
 function renderLedger(){
+  renderLedgerCalendar();
   const savings = getBucketBalance("savings");
   const wallet = getBucketBalance("wallet");
   document.getElementById("walletAmount").innerHTML = wallet.toLocaleString("ja-JP")+"<span>円</span>";
