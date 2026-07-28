@@ -1401,7 +1401,7 @@ function renderHome(){
   } else {
     const priorStreak = getStreakThroughYesterday(state);
     if(priorStreak>0){
-      streakDaysLine.innerHTML = `れんぞく<span>${priorStreak}</span>日目 れんぞく中！`;
+      streakDaysLine.innerHTML = `れんぞく<span>${priorStreak}</span>日目 たっせい中！`;
       streakCheerText.textContent = `今日もやれば${priorStreak+1}日目！よし やるぞ！🔥`;
     } else {
       streakDaysLine.innerHTML = `今日から 挑戦！`;
