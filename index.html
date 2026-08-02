@@ -2564,6 +2564,7 @@ function buildReflectionStats(){
 }
 
 function showReflectionLock(wk){
+  if(document.getElementById("reflectionLock")) return; // 既に開いている場合は重複して作らない（ボタンが効かなくなる原因だったため）
   const stats = buildReflectionStats();
   const prevReflection = state.reflections[wk] || {good:"", bad:"", negotiation:""};
   const childMsg = generateAiSummaryForChild(stats);
