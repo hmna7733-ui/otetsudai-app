@@ -393,7 +393,7 @@ textarea{resize:vertical; min-height:70px;}
 
 /* ---------- Modal / lock overlay ---------- */
 .overlay{
-  position:fixed; inset:0; background:rgba(61,44,78,.55); z-index:60;
+  position:fixed; inset:0; background:rgba(61,44,78,.55); z-index:75;
   display:flex; align-items:flex-end; justify-content:center;
 }
 .overlay.top{align-items:flex-start;}
@@ -2566,7 +2566,8 @@ function buildReflectionStats(){
 function showReflectionLock(wk){
   const stats = buildReflectionStats();
   const prevReflection = state.reflections[wk] || {good:"", bad:"", negotiation:""};
-  const aiMsg = generateAiSummary(stats);
+  const childMsg = generateAiSummaryForChild(stats);
+  const parentMsg = generateAiSummaryForParent(stats);
 
   const overlay = document.createElement("div");
   overlay.className="lock-screen"; overlay.id="reflectionLock";
@@ -2590,9 +2591,14 @@ function showReflectionLock(wk){
       ${stats.achievedWishes.map(w=>`<p>${esc(w.name)}（${fmtYen(w.amount)}）</p>`).join("")}
     </div>` : ``}
     <div class="ai-box">
-      <span class="tag">🤖 かんたん分析</span>
-      ${aiMsg.map(p=>`<p>${p}</p>`).join("")}
+      <span class="tag">🤖 かんたん分析（こども向け）</span>
+      ${childMsg.map(p=>`<p>${p}</p>`).join("")}
     </div>
+    ${state.role==="parent" ? `
+    <div class="ai-box" style="border-left-color:var(--coral);">
+      <span class="tag" style="background:var(--coral); color:#fff;">👪 おうちの方へのアドバイス</span>
+      ${parentMsg.map(p=>`<p>${p}</p>`).join("")}
+    </div>` : ``}
     <div class="card">
       <h2>😊 今週 よかったこと（こども）</h2>
       <textarea id="refGood" placeholder="がんばったこと、できるようになったこと">${esc(prevReflection.good)}</textarea>
@@ -2640,7 +2646,12 @@ function showReflectionLock(wk){
       toast("現金をわたしたら、チェックを入れてね");
       return;
     }
-    openPasswordModal("ふりかえりを終了する", ()=> finishReflection(wk, handedChecked && walletOwed>0));
+    const proceedToPassword = ()=> openPasswordModal("ふりかえりを終了する", ()=> finishReflection(wk, handedChecked && walletOwed>0));
+    if(state.role!=="parent"){
+      showHandToParentPrompt(proceedToPassword);
+    } else {
+      proceedToPassword();
+    }
   };
   document.getElementById("btnSaveDraftReflection").onclick = ()=>saveDraftReflection(wk);
   document.getElementById("btnAddWishFromReflection").onclick = ()=>{
@@ -2654,12 +2665,46 @@ function showReflectionLock(wk){
     document.getElementById("newWishName").value="";
     document.getElementById("newWishAmount").value="";
     document.getElementById("newWishDeadline").value="";
-    toast(`「${name}」をほしいものリストに追加したよ！`);
+    showWishAddedModal(name, amount);
   };
 }
-function generateAiSummary(stats){
+function showHandToParentPrompt(onNext){
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>👨‍👩‍👧 ママ・パパに見せてね</h3></div>
+    <div style="padding:4px 20px 22px; text-align:center;">
+      <div style="font-size:44px; margin:6px 0 14px;">📱✨</div>
+      <p style="font-size:14.5px; font-weight:700; line-height:1.7;">この画面を ママたちに 見せて、<br>パスワードを 入れてもらってね！</p>
+      <button class="btn btn-primary btn-block" style="margin-top:18px;" id="btnHandToParentOk">わかった！</button>
+    </div>`;
+  openModal(html);
+  document.getElementById("btnHandToParentOk").onclick = ()=>{ closeModal(); onNext(); };
+}
+function showWishAddedModal(name, amount){
+  const html = `
+    <div class="sheet-handle"></div>
+    <div style="padding:10px 20px 24px; text-align:center;">
+      <div style="font-size:48px; margin-bottom:8px;">🎉✨</div>
+      <h3 style="margin:0 0 6px;">「${esc(name)}」を追加したよ！</h3>
+      <p style="font-size:13px; color:var(--plum-soft);">ほしいものリストに追加されました${amount>0?`（${fmtYen(amount)}）`:""}</p>
+      <button class="btn btn-mint btn-block" style="margin-top:16px;" id="btnWishAddedOk">OK！</button>
+    </div>`;
+  openModal(html);
+  document.getElementById("btnWishAddedOk").onclick = closeModal;
+}
+function generateAiSummaryForChild(stats){
   const msgs = [];
-  if(stats.totalDueDays===0){ msgs.push("まだデータが少ないよ。来週からの記録をお楽しみに！"); return msgs; }
+  if(stats.totalDueDays===0){ msgs.push("まだきろくが少ないよ。来週からのきろくをたのしみにしていてね！"); return msgs; }
+  if(stats.rate>=90) msgs.push(`たっせいりつ${stats.rate}％、とってもすごいよ！このちょうしでがんばろう！`);
+  else if(stats.rate>=60) msgs.push(`たっせいりつは${stats.rate}％だったよ。できた日もたくさんあるから、じぶんをほめてあげよう！つぎはもっとふやせるかな？`);
+  else msgs.push(`たっせいりつは${stats.rate}％だったよ。むずかしいと感じたお手伝いがあれば、おうちの人と相談して、やり方や量を変えてみよう！`);
+  if(stats.income>0) msgs.push(`お手伝いで合計${stats.income.toLocaleString("ja-JP")}円 かせいだよ！つぎは何にちょうせんする？`);
+  if(stats.extraAdded>0) msgs.push(`自分でお手伝いを${stats.extraAdded}回も ついかしたね！えらい！`);
+  return msgs;
+}
+function generateAiSummaryForParent(stats){
+  const msgs = [];
+  if(stats.totalDueDays===0){ msgs.push("まだデータが少ないため、来週以降の傾向を見ていきましょう。"); return msgs; }
   if(stats.rate>=90) msgs.push(`達成率${stats.rate}%は、とてもすばらしいペースです！このまま続けていきましょう。`);
   else if(stats.rate>=60) msgs.push(`達成率は${stats.rate}%でした。できている日も多いので、あと少しの声かけで習慣が安定しそうです。`);
   else msgs.push(`達成率は${stats.rate}%でした。ハードルが高すぎないか、量や頻度を見直すタイミングかもしれません。`);
