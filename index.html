@@ -851,26 +851,35 @@ textarea{resize:vertical; min-height:70px;}
       </div>
 
       <div class="card">
-        <h2>💰 財布・貯金箱の金額を設定</h2>
-        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">今の残高を直接書きかえたいときに使います（過去の記録はそのまま残り、差額だけが「残高調整」として記録されます）。</p>
-        <label class="f">👛 財布（つかえるお金）の金額</label>
-        <input type="number" id="setWalletInput">
-        <label class="f">🏦 貯金箱の金額</label>
-        <input type="number" id="setSavingsInput">
-        <button class="btn btn-outline btn-block" style="margin-top:14px;" id="btnSetBalances">この金額に設定する</button>
-      </div>
-
-      <div class="card">
-        <h2>🏦 貯金箱に入金・出金</h2>
-        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">お年玉などを貯金箱に追加したり、ほしいものを買うために貯金箱から引き出したりできます（お手伝いの記録には影響しません）。</p>
-        <label class="f">金額（円）</label>
-        <input type="number" id="savingsAdjustAmount" placeholder="例：5000">
-        <label class="f">メモ（任意）</label>
-        <input type="text" id="savingsAdjustMemo" placeholder="例：おばあちゃんからのお年玉">
-        <div style="display:flex; gap:10px; margin-top:14px;">
-          <button class="btn btn-mint btn-block" id="btnDepositSavings">＋ 貯金箱に追加</button>
-          <button class="btn btn-outline btn-block" id="btnWithdrawSavings">－ 貯金箱から引き出す</button>
+        <h2>💰 財布・貯金箱を調整する</h2>
+        <p style="font-size:12.5px; color:var(--plum-soft); margin-top:0;">お年玉の入金や、貯金箱から財布へのお引き出しなど、お手伝いとは関係ないお金の出し入れができます（達成記録・稼いだ金額には反映されません）。</p>
+        <div style="display:flex; gap:10px; margin-bottom:14px;">
+          <div style="flex:1; background:var(--mint-light); border-radius:14px; padding:10px 8px; text-align:center;">
+            <div style="font-size:11px; color:var(--plum-soft);">👛 財布（今）</div>
+            <div style="font-weight:800; font-size:16px;" id="balAdjustWalletNow">0円</div>
+          </div>
+          <div style="flex:1; background:#FFF3D6; border-radius:14px; padding:10px 8px; text-align:center;">
+            <div style="font-size:11px; color:var(--plum-soft);">🏦 貯金箱（今）</div>
+            <div style="font-weight:800; font-size:16px;" id="balAdjustSavingsNow">0円</div>
+          </div>
         </div>
+        <label class="f">どこを調整する？</label>
+        <div class="pill-select" id="balAdjustBucketToggle">
+          <button type="button" data-v="wallet" class="active" onclick="pickBalAdjustBucket(this,'wallet')">👛 財布</button>
+          <button type="button" data-v="savings" onclick="pickBalAdjustBucket(this,'savings')">🏦 貯金箱</button>
+        </div>
+        <label class="f" style="margin-top:12px;">内容</label>
+        <div class="pill-select" id="balAdjustTypeToggle">
+          <button type="button" data-v="income" class="active" onclick="pickBalAdjustType(this,'income')">＋ 追加</button>
+          <button type="button" data-v="expense" onclick="pickBalAdjustType(this,'expense')">－ 取り出す</button>
+          <button type="button" data-v="transfer" onclick="pickBalAdjustType(this,'transfer')">⇄ 移動</button>
+        </div>
+        <p id="balAdjustTransferNote" style="display:none; font-size:11.5px; color:var(--plum-soft); margin:6px 2px 0;"></p>
+        <label class="f" style="margin-top:12px;">金額（円）</label>
+        <input type="number" id="balAdjustAmount" placeholder="例：1000">
+        <label class="f">メモ（任意）</label>
+        <input type="text" id="balAdjustMemo" placeholder="例：おばあちゃんからのお年玉">
+        <button class="btn btn-primary btn-block" style="margin-top:14px;" id="btnApplyBalAdjust">この内容で調整する</button>
       </div>
 
       <div class="card">
@@ -1165,8 +1174,23 @@ function getBucketBalance(bucket, s=state){
   return (s.transactions||[]).filter(t=> (t.bucket||"wallet")===bucket)
     .reduce((sum,t)=> sum + (t.type==="income"? t.amount : -t.amount), 0);
 }
+function getHomeWalletBalance(s=state){
+  // 実際に子どもが手元に持っている現金の財布残高。
+  // お手伝い・緊急ミッションで貯まった「財布ぶん」は、ふりかえりで実際に渡す（_reflected）まではここに含めない。
+  // 使ったお金（expense）はその場ですぐ反映し、保護者の残高調整はすぐ反映する。
+  return (s.transactions||[]).filter(t=> (t.bucket||"wallet")==="wallet").reduce((sum,t)=>{
+    if(t.type==="expense") return sum - t.amount;
+    if(t.source==="chore" || t.source==="emergency") return t._reflected ? sum + t.amount : sum;
+    return sum + t.amount;
+  }, 0);
+}
+function getWalletPendingHandover(s=state){
+  // まだ渡していない「今週ぶん」の財布行き金額（ふりかえりで渡す予定の金額）
+  return (s.transactions||[]).filter(t=> t.type==="income" && (t.bucket||"wallet")==="wallet" && (t.source==="chore"||t.source==="emergency") && !t._reflected)
+    .reduce((sum,t)=>sum+t.amount, 0);
+}
 function getBalance(s=state){
-  return getBucketBalance("savings",s) + getBucketBalance("wallet",s);
+  return getBucketBalance("savings",s) + getHomeWalletBalance(s) + getWalletPendingHandover(s);
 }
 function splitIncome(amount, ds){
   ds = ds || todayStr();
@@ -1320,7 +1344,7 @@ function renderHome(){
   const ds = todayStr();
   const log = getLog(ds);
   const savings = getBucketBalance("savings");
-  const wallet = getBucketBalance("wallet");
+  const wallet = getHomeWalletBalance();
   document.getElementById("balanceAmount").innerHTML = savings.toLocaleString("ja-JP")+"<span>円</span>";
   document.getElementById("homeWalletAmt").innerHTML = wallet.toLocaleString("ja-JP")+"<span>円</span>";
   document.getElementById("familyNameShow").textContent = state.familyName;
@@ -1948,7 +1972,7 @@ function skipChoreRetro(choreId, ds){
 function renderLedger(){
   renderLedgerCalendar();
   const savings = getBucketBalance("savings");
-  const wallet = getBucketBalance("wallet");
+  const wallet = getHomeWalletBalance();
   document.getElementById("walletAmount").innerHTML = wallet.toLocaleString("ja-JP")+"<span>円</span>";
   document.getElementById("savingsAmount").innerHTML = savings.toLocaleString("ja-JP")+"<span>円</span>";
   const g = state.goal;
@@ -2206,44 +2230,73 @@ function renderSettings(){
   window._gachaPrizes = JSON.parse(JSON.stringify((state.streakGacha && state.streakGacha.prizes) || []));
   renderGachaPrizeList();
 
-  document.getElementById("setWalletInput").value = getBucketBalance("wallet");
-  document.getElementById("setSavingsInput").value = getBucketBalance("savings");
+  refreshBalAdjustDisplay();
 }
-function setBalances(){
-  const newWallet = parseInt(document.getElementById("setWalletInput").value)||0;
-  const newSavings = parseInt(document.getElementById("setSavingsInput").value)||0;
-  const curWallet = getBucketBalance("wallet");
-  const curSavings = getBucketBalance("savings");
-  const wDiff = newWallet - curWallet;
-  const sDiff = newSavings - curSavings;
+window._balAdjustBucket = "wallet";
+window._balAdjustType = "income";
+function pickBalAdjustBucket(el, v){
+  document.querySelectorAll("#balAdjustBucketToggle button").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+  window._balAdjustBucket = v;
+  updateBalAdjustTransferNote();
+}
+function pickBalAdjustType(el, v){
+  document.querySelectorAll("#balAdjustTypeToggle button").forEach(b=>b.classList.remove("active"));
+  el.classList.add("active");
+  window._balAdjustType = v;
+  updateBalAdjustTransferNote();
+}
+function updateBalAdjustTransferNote(){
+  const note = document.getElementById("balAdjustTransferNote");
+  if(!note) return;
+  if(window._balAdjustType==="transfer"){
+    const from = window._balAdjustBucket==="wallet" ? "👛 財布" : "🏦 貯金箱";
+    const to = window._balAdjustBucket==="wallet" ? "🏦 貯金箱" : "👛 財布";
+    note.textContent = `${from} から ${to} へ移動します`;
+    note.style.display = "block";
+  } else {
+    note.style.display = "none";
+  }
+}
+function refreshBalAdjustDisplay(){
+  const w = document.getElementById("balAdjustWalletNow");
+  const s = document.getElementById("balAdjustSavingsNow");
+  if(w) w.textContent = getHomeWalletBalance().toLocaleString("ja-JP")+"円";
+  if(s) s.textContent = getBucketBalance("savings").toLocaleString("ja-JP")+"円";
+}
+function applyBalAdjust(){
+  const amount = parseInt(document.getElementById("balAdjustAmount").value)||0;
+  if(amount<=0){ toast("金額を入力してね"); return; }
+  const memo = document.getElementById("balAdjustMemo").value.trim();
+  const bucket = window._balAdjustBucket;
+  const type = window._balAdjustType;
   const ds = todayStr();
-  if(wDiff!==0) addTransaction(wDiff>0?"income":"expense", Math.abs(wDiff), "残高調整（保護者設定）", {bucket:"wallet", source:"balanceAdjust", date:ds});
-  if(sDiff!==0) addTransaction(sDiff>0?"income":"expense", Math.abs(sDiff), "残高調整（保護者設定）", {bucket:"savings", source:"balanceAdjust", date:ds});
-  saveState(); renderHome(); toast("金額を設定したよ");
-}
-function depositToSavings(){
-  const amount = parseInt(document.getElementById("savingsAdjustAmount").value)||0;
-  if(amount<=0){ toast("金額を入力してね"); return; }
-  const memo = document.getElementById("savingsAdjustMemo").value.trim();
-  addTransaction("income", amount, memo || "貯金箱に追加（保護者）", {bucket:"savings", source:"parentAdjust", date:todayStr()});
-  saveState(); renderHome(); renderSettings();
-  document.getElementById("savingsAdjustAmount").value = "";
-  document.getElementById("savingsAdjustMemo").value = "";
-  toast(`貯金箱に${amount.toLocaleString("ja-JP")}円 追加したよ`);
-}
-function withdrawFromSavings(){
-  const amount = parseInt(document.getElementById("savingsAdjustAmount").value)||0;
-  if(amount<=0){ toast("金額を入力してね"); return; }
-  const cur = getBucketBalance("savings");
-  if(amount>cur){ toast("貯金箱の残高より多い金額は引き出せません"); return; }
-  const memo = document.getElementById("savingsAdjustMemo").value.trim();
-  openConfirmModal(`貯金箱から${amount.toLocaleString("ja-JP")}円 引き出しますか？`, ()=>{
-    addTransaction("expense", amount, memo || "貯金箱から引き出し（保護者）", {bucket:"savings", source:"parentAdjust", date:todayStr()});
-    saveState(); renderHome(); renderSettings();
-    document.getElementById("savingsAdjustAmount").value = "";
-    document.getElementById("savingsAdjustMemo").value = "";
-    toast(`貯金箱から${amount.toLocaleString("ja-JP")}円 引き出したよ`);
-  }, "引き出す", true);
+  const bucketLabel = bucket==="wallet" ? "財布" : "貯金箱";
+  const otherBucket = bucket==="wallet" ? "savings" : "wallet";
+  const otherLabel = bucket==="wallet" ? "貯金箱" : "財布";
+
+  const doApply = ()=>{
+    if(type==="income"){
+      addTransaction("income", amount, memo || `${bucketLabel}に追加（保護者）`, {bucket, source:"parentAdjust", date:ds});
+    } else if(type==="expense"){
+      addTransaction("expense", amount, memo || `${bucketLabel}から取り出し（保護者）`, {bucket, source:"parentAdjust", date:ds});
+    } else {
+      addTransaction("expense", amount, memo || `${otherLabel}へ移動`, {bucket, source:"parentAdjust", date:ds});
+      addTransaction("income", amount, memo || `${bucketLabel}から移動`, {bucket:otherBucket, source:"parentAdjust", date:ds});
+    }
+    saveState(); renderHome(); refreshBalAdjustDisplay();
+    document.getElementById("balAdjustAmount").value = "";
+    document.getElementById("balAdjustMemo").value = "";
+    toast("調整したよ");
+  };
+
+  if(type!=="income"){
+    const cur = bucket==="wallet" ? getHomeWalletBalance() : getBucketBalance("savings");
+    if(amount>cur){ toast(`${bucketLabel}の残高より多い金額は指定できません`); return; }
+    openConfirmModal(`${bucketLabel}から${amount.toLocaleString("ja-JP")}円 ${type==="transfer"?"移動":"取り出"}しますか？`, doApply, type==="transfer"?"移動する":"取り出す", true);
+  } else {
+    doApply();
+  }
 }
 function toggleMilestone(el, key){
   window._streakMilestones[key] = !window._streakMilestones[key];
@@ -2559,7 +2612,7 @@ function buildReflectionStats(){
   const achievedWishes = (state.wishlist||[]).filter(w=> w.done && w.doneDate && (!state._lastReflectedUpTo || w.doneDate>state._lastReflectedUpTo));
   const walletIncomeTotal = state.transactions.filter(t=>t.type==="income" && !t._reflected && (t.bucket||"wallet")==="wallet").reduce((s,t)=>s+t.amount,0);
   const savingsIncomeTotal = state.transactions.filter(t=>t.type==="income" && !t._reflected && t.bucket==="savings").reduce((s,t)=>s+t.amount,0);
-  const walletOwed = getBucketBalance("wallet");
+  const walletOwed = getWalletPendingHandover();
   return {income, expense, doneDays, totalDueDays, rate, extraAdded, extraCompleted, emergencyTotal, emergencyDone, emergencyRate, gachaBonusTotal, gachaGiftTotal, achievedWishes, walletIncomeTotal, savingsIncomeTotal, walletOwed};
 }
 
@@ -2625,7 +2678,7 @@ function showReflectionLock(wk){
     <div class="card">
       <h2>💵 今週のお金の受け渡し</h2>
       <div class="stat-grid" style="margin:10px 0 0;">
-        <div class="stat-box"><div class="v">${fmtYen(stats.walletOwed)}</div><div class="l">👛 財布へ（現金でわたす）</div></div>
+        <div class="stat-box"><div class="v">${fmtYen(stats.walletOwed)}</div><div class="l">👛 今週ぶんを財布へ（現金でわたす）</div></div>
         <div class="stat-box"><div class="v">${fmtYen(stats.savingsIncomeTotal)}</div><div class="l">🏦 貯金箱（口座）へ入れる</div></div>
       </div>
       <label style="display:flex; align-items:flex-start; gap:8px; margin-top:14px; font-size:13px; font-weight:700; line-height:1.5;">
@@ -2724,16 +2777,16 @@ function saveDraftReflection(wk){
   toast("下書きを保存したよ");
 }
 function finishReflection(wk, cashHandedOver){
+  const stats = buildReflectionStats(); // 確定時点の今週分の収支を履歴用に記録しておく
   state.reflections[wk] = {
     good: document.getElementById("refGood").value,
     bad: document.getElementById("refBad").value,
     negotiation: document.getElementById("refNego").value,
-    confirmed:true, confirmedAt: new Date().toISOString()
+    confirmed:true, confirmedAt: new Date().toISOString(),
+    income: stats.income, expense: stats.expense, walletHanded: stats.walletOwed, savingsAdded: stats.savingsIncomeTotal
   };
-  if(cashHandedOver){
-    const owed = getBucketBalance("wallet");
-    if(owed>0) addTransaction("expense", owed, "現金でおわたし済み（ふりかえり時に精算）", {bucket:"wallet", date:todayStr()});
-  }
+  // 「財布へ渡す」ぶんは、ここで支出として差し引くのではなく、
+  // 各取引を _reflected 済みにすることで「実際に手元にある財布残高」へ反映させる（getHomeWalletBalance参照）
   state.lastReflectionWeek = wk;
   state._lastReflectedUpTo = todayStr();
   state.transactions.forEach(t=>t._reflected=true);
@@ -2761,11 +2814,16 @@ function openReflectionHistory(){
     <div style="padding:4px 20px;">
       ${keys.length ? keys.map(wk=>{
         const r = state.reflections[wk];
+        const hasMoneyInfo = r.income!=null || r.expense!=null;
         return `<div class="card" style="margin:0 0 12px;">
           <div class="row-between">
             <h2 style="margin:0;">${weekLabel(wk)}${r.confirmed?"":"（下書き）"}</h2>
             ${isParent ? `<div class="row-actions"><button class="icon-btn" onclick="confirmEditReflection('${wk}')">✏️</button><button class="icon-btn" onclick="confirmDeleteReflection('${wk}')">🗑️</button></div>` : ``}
           </div>
+          ${hasMoneyInfo ? `<div class="stat-grid" style="margin:8px 0 4px;">
+            <div class="stat-box"><div class="v">${fmtYen(r.income||0)}</div><div class="l">💪 稼いだお金</div></div>
+            <div class="stat-box"><div class="v">${fmtYen(r.expense||0)}</div><div class="l">💸 使ったお金</div></div>
+          </div>` : ``}
           <div style="font-size:12.5px; margin-top:8px;"><b>😊 よかったこと：</b>${esc(r.good)||"（未記入）"}</div>
           <div style="font-size:12.5px; margin-top:6px;"><b>😣 むずかしかったこと：</b>${esc(r.bad)||"（未記入）"}</div>
           <div style="font-size:12.5px; margin-top:6px;"><b>🤝 相談メモ：</b>${esc(r.negotiation)||"（未記入）"}</div>
@@ -3168,9 +3226,7 @@ document.getElementById("btnSaveSavingsRule").onclick = saveSavingsRule;
 document.getElementById("btnAddGachaPrize").onclick = addGachaPrize;
 document.getElementById("btnSaveGacha").onclick = saveGacha;
 document.getElementById("btnTestGacha").onclick = testGachaSpin;
-document.getElementById("btnSetBalances").onclick = setBalances;
-document.getElementById("btnDepositSavings").onclick = depositToSavings;
-document.getElementById("btnWithdrawSavings").onclick = withdrawFromSavings;
+document.getElementById("btnApplyBalAdjust").onclick = applyBalAdjust;
 document.getElementById("btnChangePassword").onclick = changeParentPassword;
 document.getElementById("btnFbSignOut").onclick = ()=>{
   openConfirmModal("この端末でログアウトしますか？次回からまたログインが必要になります。", ()=>{
