@@ -674,13 +674,13 @@ textarea{resize:vertical; min-height:70px;}
       </div>
 
       <div class="money-row">
-        <div class="money-card wallet">
+        <div class="money-card wallet" id="homeWalletCard">
           <div class="mc-label">👛 財布</div>
           <div class="mc-amount" id="homeWalletAmt">0<span>円</span></div>
           <div class="mc-sub">いま つかえるお金</div>
           <div class="mc-wallet-icon">👛</div>
         </div>
-        <div class="money-card savings">
+        <div class="money-card savings" id="homeSavingsCard">
           <div class="mc-label">🏦 貯金箱</div>
           <div class="mc-amount" id="balanceAmount">0<span>円</span></div>
           <div class="mc-jar"><svg id="jarSvg" width="44" height="52" viewBox="0 0 54 64"></svg></div>
@@ -751,13 +751,13 @@ textarea{resize:vertical; min-height:70px;}
     <div class="screen" id="screen-ledger">
       <div class="topbar" style="padding-top:6px;"><h1>👛 おこづかい帖</h1></div>
       <div class="money-row">
-        <div class="money-card wallet">
+        <div class="money-card wallet" id="ledgerWalletCard">
           <div class="mc-label">👛 財布</div>
           <div class="mc-amount" id="walletAmount">0<span>円</span></div>
           <div class="mc-sub">いま つかえるお金</div>
           <div class="mc-wallet-icon">👛</div>
         </div>
-        <div class="money-card savings">
+        <div class="money-card savings" id="ledgerSavingsCard">
           <div class="mc-label">🏦 貯金箱</div>
           <div class="mc-amount" id="savingsAmount">0<span>円</span></div>
           <div class="mc-jar"><svg id="savingsJar" width="44" height="52" viewBox="0 0 54 64"></svg></div>
@@ -1873,6 +1873,83 @@ function saveChoreForm(existingId){
 /* =========================================================================
    RENDER: LEDGER
 ========================================================================= */
+window._bucketChartRange = "week";
+window._bucketChartBucket = "wallet";
+function openBucketChart(bucket){
+  if(state.role!=="parent") return;
+  window._bucketChartBucket = bucket;
+  window._bucketChartRange = "week";
+  renderBucketChartModal();
+}
+function setBucketChartRange(range){
+  window._bucketChartRange = range;
+  renderBucketChartModal();
+}
+function buildLineChartSvg(values, labels){
+  const w = 320, h = 170, padL = 36, padR = 12, padT = 14, padB = 22;
+  const innerW = w - padL - padR;
+  const innerH = h - padT - padB;
+  const n = values.length;
+  const maxAbs = Math.max(1, ...values.map(v=>Math.abs(v)));
+  const stepX = n>1 ? innerW/(n-1) : 0;
+  const zeroY = padT + innerH/2;
+  const scaleY = (innerH/2) / maxAbs;
+  const pts = values.map((v,i)=>({x:padL+i*stepX, y:zeroY-v*scaleY, v}));
+  const pathD = pts.map((p,i)=>(i===0?"M":"L")+p.x.toFixed(1)+","+p.y.toFixed(1)).join(" ");
+  const areaD = pathD + ` L${pts[pts.length-1].x.toFixed(1)},${zeroY.toFixed(1)} L${pts[0].x.toFixed(1)},${zeroY.toFixed(1)} Z`;
+  const dots = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="var(--coral)"></circle>`).join("");
+  const skip = n>10 ? Math.ceil(n/7) : 1;
+  const labelEls = labels.map((lb,i)=>{
+    if(i%skip!==0 && i!==n-1) return "";
+    const x = padL+i*stepX;
+    return `<text x="${x.toFixed(1)}" y="${h-6}" font-size="8" text-anchor="middle" fill="#8C7B9B">${lb}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;">
+    <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w-padR}" y2="${zeroY.toFixed(1)}" stroke="#F1E5D6" stroke-width="1"/>
+    <path d="${areaD}" fill="#FF6F91" opacity="0.12"></path>
+    <path d="${pathD}" fill="none" stroke="#FF6F91" stroke-width="2.2"></path>
+    ${dots}
+    ${labelEls}
+  </svg>`;
+}
+function renderBucketChartModal(){
+  const bucket = window._bucketChartBucket;
+  const range = window._bucketChartRange;
+  const bucketLabel = bucket==="wallet" ? "👛 財布" : "🏦 貯金箱";
+  const days = range==="week" ? 7 : 30;
+  const today = new Date();
+  const dateList = [];
+  for(let i=days-1;i>=0;i--){
+    const d = new Date(today); d.setDate(d.getDate()-i);
+    dateList.push(todayStr(d));
+  }
+  const values = dateList.map(ds=>{
+    return state.transactions.filter(t=>t.date===ds && (t.bucket||"wallet")===bucket)
+      .reduce((s,t)=> s + (t.type==="income"? t.amount : -t.amount), 0);
+  });
+  const labels = dateList.map(ds=>{ const [y,m,d] = ds.split("-"); return `${parseInt(m)}/${parseInt(d)}`; });
+  const totalChange = values.reduce((a,b)=>a+b,0);
+  const svg = buildLineChartSvg(values, labels);
+  const rows = dateList.map((ds,i)=>{
+    const [y,m,d] = ds.split("-");
+    const v = values[i];
+    return `<div class="day-detail-row"><span>${parseInt(m)}/${parseInt(d)}</span><span style="font-weight:800; color:${v>0?'var(--success)':v<0?'var(--danger)':'var(--plum-soft)'};">${v>0?'+':''}${v.toLocaleString("ja-JP")}円</span></div>`;
+  }).reverse().join("");
+  const html = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>${bucketLabel}の増減</h3><button class="close-x" onclick="closeModal()">✕</button></div>
+    <div style="padding:4px 20px 20px;">
+      <div class="pill-select" style="margin-bottom:14px;">
+        <button type="button" class="${range==='week'?'active':''}" onclick="setBucketChartRange('week')">週間</button>
+        <button type="button" class="${range==='month'?'active':''}" onclick="setBucketChartRange('month')">月間</button>
+      </div>
+      <div style="background:#fff; border-radius:16px; padding:12px 8px; box-shadow:var(--shadow);">${svg}</div>
+      <div style="text-align:center; margin-top:10px; font-size:13px; color:var(--plum-soft);">この${range==='week'?'週間':'30日間'}の合計：<b style="color:${totalChange>=0?'var(--success)':'var(--danger)'}; font-size:16px;">${totalChange>=0?'+':''}${totalChange.toLocaleString("ja-JP")}円</b></div>
+      <label class="f" style="margin-top:16px;">日ごとの増減</label>
+      <div>${rows}</div>
+    </div>`;
+  openModal(html);
+}
 let ledgerCalMonth = null;
 function renderLedgerCalendar(){
   const wrap = document.getElementById("ledgerCalendarWrap");
@@ -3079,6 +3156,12 @@ function applyRoleUI(){
   document.getElementById("fabEmergency").style.display = isParent? "flex":"none";
   document.getElementById("fabGiftGacha").style.display = isParent? "flex":"none";
   document.getElementById("bellWrap").style.display = isParent? "flex":"none";
+  [["homeWalletCard","wallet"],["homeSavingsCard","savings"],["ledgerWalletCard","wallet"],["ledgerSavingsCard","savings"]].forEach(([id,bucket])=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.style.cursor = isParent ? "pointer" : "default";
+    el.onclick = isParent ? ()=>openBucketChart(bucket) : null;
+  });
   updateBellBadge();
   buildTabbar();
 }
